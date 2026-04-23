@@ -76,6 +76,12 @@ if (
     && $_POST === []
     && $_FILES === []
 ) {
+    logUploadDiagnostic('empty_post_request', [
+        'content_length' => $_SERVER['CONTENT_LENGTH'] ?? null,
+        'content_type' => $_SERVER['CONTENT_TYPE'] ?? null,
+        'request_uri' => $_SERVER['REQUEST_URI'] ?? null,
+        'session_id' => session_id(),
+    ]);
     setFlash('error', LOC('upload.error.request_empty'));
     header('Location: ' . appUrl('index.php', ['page' => 'upload']));
     exit;
@@ -83,7 +89,19 @@ if (
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') === 'upload_transcript') {
     try {
+        logUploadDiagnostic('upload_post_received', [
+            'post_keys' => array_keys($_POST),
+            'file_keys' => array_keys($_FILES),
+            'session_id' => session_id(),
+            'user_email' => getCurrentUserEmail(),
+        ]);
+
         if (!isValidCsrf($_POST['csrf_token'] ?? null)) {
+            logUploadDiagnostic('upload_csrf_failed', [
+                'session_id' => session_id(),
+                'posted_token_present' => isset($_POST['csrf_token']),
+                'session_token_present' => isset($_SESSION['csrf_token']),
+            ]);
             throw new RuntimeException(LOC('error.unexpected'));
         }
 
@@ -103,8 +121,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') =
             getCurrentUserEmail()
         );
 
+        logUploadDiagnostic('upload_sharepoint_success', [
+            'file_name' => $uploadResult['file_name'] ?? null,
+            'drive_item_id' => $uploadResult['drive_item_id'] ?? null,
+        ]);
+
         setFlash('success', LOC('upload.success', $uploadResult['file_name']));
     } catch (Throwable $exception) {
+        logUploadDiagnostic('upload_failed', [
+            'message' => $exception->getMessage(),
+            'file_error' => $_FILES['transcript_file']['error'] ?? null,
+            'file_name' => $_FILES['transcript_file']['name'] ?? null,
+            'content_length' => $_SERVER['CONTENT_LENGTH'] ?? null,
+        ]);
         setFlash('error', LOC('upload.error.sharepoint', $exception->getMessage()));
     }
 

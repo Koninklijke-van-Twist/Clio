@@ -13,6 +13,7 @@
 ## Data en logica werkorders
 - `web/index.php` is een ~50-regelige controller die alleen `require`-statements en HTML-output bevat.
 - Alle PHP-logica is verdeeld over de volgende bestanden onder `web/content/`:
+- De webserver ondersteund mbstring NIET. Gebruik dus geen functies zoals mb_substr().
 
 | Bestand | Verantwoordelijkheid |
 |---|---|

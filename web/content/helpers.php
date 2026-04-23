@@ -9,6 +9,15 @@ function h(string $value): string
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
 }
 
+function safeUtf8Substr(string $value, int $start, int $length): string
+{
+    if (function_exists('mb_substr')) {
+        return (string) mb_substr($value, $start, $length, 'UTF-8');
+    }
+
+    return (string) substr($value, $start, $length);
+}
+
 function appUrl(string $path = '', array $query = []): string
 {
     $base = 'index.php';
@@ -47,6 +56,22 @@ function setFlash(string $type, string $message): void
         'type' => $type,
         'message' => $message,
     ];
+}
+
+function logUploadDiagnostic(string $event, array $context = []): void
+{
+    $payload = ['event' => $event];
+
+    foreach ($context as $key => $value) {
+        if (is_scalar($value) || $value === null) {
+            $payload[$key] = $value;
+            continue;
+        }
+
+        $payload[$key] = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    error_log('[Clio upload] ' . json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 }
 
 function getSharePointConfig(): array
@@ -310,7 +335,7 @@ function sanitizeTitleToFilename(string $title): string
         $safe = 'meeting-transcript-' . date('Ymd-His');
     }
 
-    return mb_substr($safe, 0, 120);
+    return safeUtf8Substr($safe, 0, 120);
 }
 
 function parseTxtFile(string $tmpFilePath): array
@@ -558,7 +583,7 @@ function sanitizeUploadedFilename(string $fileName): string
         $base = 'meeting-transcript-' . date('Ymd-His') . '.txt';
     }
 
-    return mb_substr($base, 0, 180);
+    return safeUtf8Substr($base, 0, 180);
 }
 
 function sanitizeEmailForFilenamePrefix(string $email): string
@@ -580,7 +605,7 @@ function buildUploadFilenameForUser(string $originalName, string $userEmail): st
     }
 
     $prefixed = $emailPrefix . '_' . $safeOriginal;
-    return mb_substr($prefixed, 0, 220);
+    return safeUtf8Substr($prefixed, 0, 220);
 }
 
 function detectUploadContentType(string $filename): string
