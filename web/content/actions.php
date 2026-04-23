@@ -70,6 +70,17 @@ if ((string) ($_GET['action'] ?? '') === 'download_summary') {
     }
 }
 
+if (
+    $_SERVER['REQUEST_METHOD'] === 'POST'
+    && $page === 'upload'
+    && $_POST === []
+    && $_FILES === []
+) {
+    setFlash('error', LOC('upload.error.request_empty'));
+    header('Location: ' . appUrl('index.php', ['page' => 'upload']));
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') === 'upload_transcript') {
     try {
         if (!isValidCsrf($_POST['csrf_token'] ?? null)) {

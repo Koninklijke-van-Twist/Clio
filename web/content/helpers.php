@@ -388,6 +388,22 @@ function parseUploadedTranscriptFile(array $file): array
     $name = (string) ($file['name'] ?? '');
     $tmpName = (string) ($file['tmp_name'] ?? '');
     $size = (int) ($file['size'] ?? 0);
+    $error = (int) ($file['error'] ?? UPLOAD_ERR_OK);
+
+    if ($error !== UPLOAD_ERR_OK) {
+        $message = match ($error) {
+            UPLOAD_ERR_INI_SIZE => LOC('upload.error.server_size'),
+            UPLOAD_ERR_FORM_SIZE => LOC('upload.error.form_size'),
+            UPLOAD_ERR_PARTIAL => LOC('upload.error.partial'),
+            UPLOAD_ERR_NO_FILE => LOC('upload.error.file_required'),
+            UPLOAD_ERR_NO_TMP_DIR => LOC('upload.error.no_tmp_dir'),
+            UPLOAD_ERR_CANT_WRITE => LOC('upload.error.cant_write'),
+            UPLOAD_ERR_EXTENSION => LOC('upload.error.extension_blocked'),
+            default => LOC('upload.error.parse_failed'),
+        };
+
+        throw new RuntimeException($message);
+    }
 
     if ($tmpName === '' || !is_uploaded_file($tmpName)) {
         throw new RuntimeException(LOC('upload.error.file_required'));
