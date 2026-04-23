@@ -88,6 +88,8 @@ if (
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') === 'upload_transcript') {
+    $redirectQuery = ['page' => 'summaries'];
+
     try {
         logUploadDiagnostic('upload_post_received', [
             'post_keys' => array_keys($_POST),
@@ -126,6 +128,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') =
             'drive_item_id' => $uploadResult['drive_item_id'] ?? null,
         ]);
 
+        if (!empty($uploadResult['drive_item_id'])) {
+            $redirectQuery['summary_id'] = (string) $uploadResult['drive_item_id'];
+        }
+
         setFlash('success', LOC('upload.success', $uploadResult['file_name']));
     } catch (Throwable $exception) {
         logUploadDiagnostic('upload_failed', [
@@ -137,6 +143,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') =
         setFlash('error', LOC('upload.error.sharepoint', $exception->getMessage()));
     }
 
-    header('Location: ' . appUrl('index.php', ['page' => 'upload']));
+    header('Location: ' . appUrl('index.php', $redirectQuery));
     exit;
 }
