@@ -292,7 +292,6 @@ require_once __DIR__ . '/content/data.php';
         }
 
         .summary-item {
-            max-height: 150px;
             margin-bottom: 10px;
             border: 1px solid #d9cab2;
             border-radius: 12px;

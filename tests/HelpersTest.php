@@ -207,6 +207,15 @@ final class HelpersTest extends TestCase
         $this->assertFalse(hasMeetingSummaryStatus(null));
     }
 
+    public function testHasUnprocessedTranscriptStatusForStringAndArray(): void
+    {
+        $this->assertTrue(hasUnprocessedTranscriptStatus('Onverwerkt Transcript'));
+        $this->assertTrue(hasUnprocessedTranscriptStatus(['Onverwerkt Transcript', 'Meeting Samenvatting']));
+        $this->assertTrue(hasUnprocessedTranscriptStatus(['Value' => 'Onverwerkt Transcript']));
+        $this->assertFalse(hasUnprocessedTranscriptStatus('Meeting Samenvatting'));
+        $this->assertFalse(hasUnprocessedTranscriptStatus(null));
+    }
+
     public function testToBoolParsesCommonValues(): void
     {
         $this->assertTrue(toBool('true', false));
@@ -275,5 +284,92 @@ final class HelpersTest extends TestCase
     {
         $this->assertSame('Samenvatting_test.md', summaryDownloadFilename('Samenvatting_test.txt', 'abc'));
         $this->assertSame('summary-abc.md', summaryDownloadFilename('', 'abc'));
+    }
+
+    public function testSummaryCacheWebPathUsesSanitizedId(): void
+    {
+        $this->assertSame('cache/summaries/a_b_c.md', getSummaryCacheWebPath('a/b:c'));
+    }
+
+    public function testSummaryCacheTtlDefaultsToOneWeek(): void
+    {
+        $this->assertSame(604800, getSummaryCacheTtlSeconds());
+    }
+
+    public function testPruneSummaryCacheFilesRemovesOldEntries(): void
+    {
+        $cacheDir = getSummaryCacheDir();
+        if (!is_dir($cacheDir)) {
+            mkdir($cacheDir, 0750, true);
+        }
+
+        $oldFile = $cacheDir . '/__old_test__.md';
+        $newFile = $cacheDir . '/__new_test__.md';
+        file_put_contents($oldFile, 'old');
+        file_put_contents($newFile, 'new');
+        touch($oldFile, time() - 7200);
+        touch($newFile, time());
+
+        pruneSummaryCacheFiles(3600);
+
+        $this->assertFalse(is_file($oldFile));
+        $this->assertTrue(is_file($newFile));
+
+        if (is_file($newFile)) {
+            unlink($newFile);
+        }
+    }
+
+    public function testEstimateUnprocessedSummaryEtaReturnsMinutesUntilNextCycle(): void
+    {
+        $_SESSION['lang'] = 'nl';
+
+        $items = [
+            [
+                'is_openable' => true,
+                'created_at' => '2026-04-23T11:20:00Z',
+            ],
+        ];
+
+        $eta = estimateUnprocessedSummaryEta($items, '2026-04-23T12:05:00Z', strtotime('2026-04-23T12:10:00Z'));
+
+        $this->assertSame('ongeveer 10 minuten', $eta);
+    }
+
+    public function testEstimateUnprocessedSummaryEtaReturnsLessThanMinuteWhenCyclePassed(): void
+    {
+        $_SESSION['lang'] = 'nl';
+
+        $items = [
+            [
+                'is_openable' => true,
+                'created_at' => '2026-04-23T11:20:00Z',
+            ],
+        ];
+
+        $eta = estimateUnprocessedSummaryEta($items, '2026-04-23T12:05:00Z', strtotime('2026-04-23T12:21:00Z'));
+
+        $this->assertSame('minder dan een minuut', $eta);
+    }
+
+    public function testAddEtaToUnprocessedSummariesAddsEtaOnlyToPendingItems(): void
+    {
+        $_SESSION['lang'] = 'nl';
+
+        $items = [
+            [
+                'is_openable' => true,
+                'created_at' => '2026-04-23T11:20:00Z',
+            ],
+            [
+                'is_openable' => false,
+                'created_at' => '2026-04-23T12:05:00Z',
+            ],
+        ];
+
+        $withEta = addEtaToUnprocessedSummaries($items, strtotime('2026-04-23T12:10:00Z'));
+
+        $this->assertSame('', $withEta[0]['eta_text']);
+        $this->assertSame('ongeveer 10 minuten', $withEta[1]['eta_text']);
     }
 }

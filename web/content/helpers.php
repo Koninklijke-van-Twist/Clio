@@ -491,6 +491,27 @@ function hasMeetingSummaryStatus(mixed $value): bool
     return false;
 }
 
+function hasUnprocessedTranscriptStatus(mixed $value): bool
+{
+    if (is_string($value)) {
+        return trim($value) === SHAREPOINT_STATUS_UNPROCESSED;
+    }
+
+    if (is_array($value) && isset($value['Value']) && is_string($value['Value'])) {
+        return trim($value['Value']) === SHAREPOINT_STATUS_UNPROCESSED;
+    }
+
+    if (is_array($value)) {
+        foreach ($value as $entry) {
+            if (is_string($entry) && trim($entry) === SHAREPOINT_STATUS_UNPROCESSED) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
 function sortSummariesByCreatedDesc(array $items): array
 {
     usort($items, static function (array $left, array $right): int {
@@ -508,10 +529,51 @@ function getSummaryCacheDir(): string
     return __DIR__ . '/../cache/summaries';
 }
 
+function getSummaryCacheTtlSeconds(): int
+{
+    return 7 * 24 * 60 * 60;
+}
+
 function getSummaryCachePath(string $driveItemId): string
 {
     $safeId = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $driveItemId);
     return getSummaryCacheDir() . '/' . $safeId . '.md';
+}
+
+function getSummaryCacheWebPath(string $driveItemId): string
+{
+    $safeId = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $driveItemId);
+    return 'cache/summaries/' . $safeId . '.md';
+}
+
+function pruneSummaryCacheFiles(int $maxAgeSeconds = 0): void
+{
+    $age = $maxAgeSeconds > 0 ? $maxAgeSeconds : getSummaryCacheTtlSeconds();
+    $cacheDir = getSummaryCacheDir();
+    if (!is_dir($cacheDir)) {
+        return;
+    }
+
+    $entries = glob($cacheDir . '/*.md');
+    if (!is_array($entries)) {
+        return;
+    }
+
+    $now = time();
+    foreach ($entries as $entry) {
+        if (!is_file($entry)) {
+            continue;
+        }
+
+        $mtime = filemtime($entry);
+        if ($mtime === false) {
+            continue;
+        }
+
+        if (($now - $mtime) > $age) {
+            @unlink($entry);
+        }
+    }
 }
 
 function isCacheFileFresh(string $cachePath, int $ttlSeconds): bool
@@ -528,8 +590,14 @@ function isCacheFileFresh(string $cachePath, int $ttlSeconds): bool
     return (time() - $mtime) <= $ttlSeconds;
 }
 
-function getCachedSummaryText(string $driveItemId, int $ttlSeconds = 86400): ?string
+function getCachedSummaryText(string $driveItemId, int $ttlSeconds = 0): ?string
 {
+    pruneSummaryCacheFiles();
+
+    if ($ttlSeconds <= 0) {
+        $ttlSeconds = getSummaryCacheTtlSeconds();
+    }
+
     $cachePath = getSummaryCachePath($driveItemId);
     if (!isCacheFileFresh($cachePath, $ttlSeconds)) {
         return null;
@@ -541,6 +609,8 @@ function getCachedSummaryText(string $driveItemId, int $ttlSeconds = 86400): ?st
 
 function saveCachedSummaryText(string $driveItemId, string $text): void
 {
+    pruneSummaryCacheFiles();
+
     $cacheDir = getSummaryCacheDir();
     if (!is_dir($cacheDir)) {
         mkdir($cacheDir, 0750, true);
@@ -560,6 +630,83 @@ function summaryDownloadFilename(string $name, string $fallbackId): string
     $base = sanitizeTitleToFilename((string) $base);
 
     return $base . '.md';
+}
+
+function extractCreatedTimestamp(array $item): int
+{
+    $createdAt = (string) ($item['created_at'] ?? '');
+    return strtotime($createdAt) ?: 0;
+}
+
+function getLatestProcessedSummaryMinute(array $items): ?int
+{
+    $latestTimestamp = 0;
+
+    foreach ($items as $item) {
+        if (($item['is_openable'] ?? false) !== true) {
+            continue;
+        }
+
+        $itemTimestamp = extractCreatedTimestamp($item);
+        if ($itemTimestamp > $latestTimestamp) {
+            $latestTimestamp = $itemTimestamp;
+        }
+    }
+
+    if ($latestTimestamp <= 0) {
+        return null;
+    }
+
+    return (int) gmdate('i', $latestTimestamp);
+}
+
+function estimateUnprocessedSummaryEta(array $items, string $uploadedAt, ?int $nowTimestamp = null): string
+{
+    $uploadedTimestamp = strtotime($uploadedAt);
+    if ($uploadedTimestamp === false) {
+        return LOC('summary.eta_less_than_minute');
+    }
+
+    $now = $nowTimestamp ?? time();
+    $cycleMinute = getLatestProcessedSummaryMinute($items);
+    if ($cycleMinute === null) {
+        $cycleMinute = (int) gmdate('i', $uploadedTimestamp);
+    }
+
+    $hourStart = gmmktime((int) gmdate('H', $uploadedTimestamp), 0, 0, (int) gmdate('n', $uploadedTimestamp), (int) gmdate('j', $uploadedTimestamp), (int) gmdate('Y', $uploadedTimestamp));
+    $nextCycle = $hourStart + ($cycleMinute * 60);
+    while ($nextCycle <= $uploadedTimestamp) {
+        $nextCycle += 3600;
+    }
+
+    if ($now >= $nextCycle) {
+        return LOC('summary.eta_less_than_minute');
+    }
+
+    $minutesLeft = (int) ceil(($nextCycle - $now) / 60);
+    if ($minutesLeft <= 0) {
+        return LOC('summary.eta_less_than_minute');
+    }
+
+    return LOC('summary.eta_minutes', $minutesLeft);
+}
+
+function addEtaToUnprocessedSummaries(array $items, ?int $nowTimestamp = null): array
+{
+    foreach ($items as $index => $item) {
+        if (($item['is_openable'] ?? false) === true) {
+            $items[$index]['eta_text'] = '';
+            continue;
+        }
+
+        $items[$index]['eta_text'] = estimateUnprocessedSummaryEta(
+            $items,
+            (string) ($item['created_at'] ?? ''),
+            $nowTimestamp
+        );
+    }
+
+    return $items;
 }
 
 function uploadTranscriptToSharePoint(string $title, string $content): array
@@ -665,8 +812,10 @@ function fetchMeetingSummaries(): array
     foreach ($items as $item) {
         $fields = $item['listItem']['fields'] ?? [];
         $statusValue = $fields[$config['status_field']] ?? null;
+        $isProcessed = hasMeetingSummaryStatus($statusValue);
+        $isUnprocessed = hasUnprocessedTranscriptStatus($statusValue);
 
-        if (!hasMeetingSummaryStatus($statusValue)) {
+        if (!$isProcessed && !$isUnprocessed) {
             continue;
         }
 
@@ -676,12 +825,15 @@ function fetchMeetingSummaries(): array
             'name' => (string) ($item['name'] ?? $fields['Title'] ?? 'Onbekend bestand'),
             'web_url' => (string) ($item['webUrl'] ?? ''),
             'title' => (string) ($fields['Title'] ?? ''),
-            'status' => is_string($statusValue) ? $statusValue : '',
+            'status' => $isProcessed ? SHAREPOINT_STATUS_MEETING_SUMMARY : SHAREPOINT_STATUS_UNPROCESSED,
+            'is_openable' => $isProcessed,
             'created_at' => (string) ($item['createdDateTime'] ?? $fields['Created'] ?? ''),
         ];
     }
 
-    return sortSummariesByCreatedDesc($results);
+    $results = sortSummariesByCreatedDesc($results);
+
+    return addEtaToUnprocessedSummaries($results);
 }
 
 function getDriveItemInfoById(string $driveItemId): array

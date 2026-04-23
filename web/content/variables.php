@@ -16,4 +16,6 @@ $selectedSummaryId = trim((string) ($_GET['summary_id'] ?? ''));
 $summaries = [];
 $selectedSummaryText = '';
 $selectedSummaryName = '';
+$selectedSummaryPendingMessage = '';
+$selectedSummaryCacheUrl = '';
 $pageError = '';

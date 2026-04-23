@@ -11,10 +11,31 @@ if ((string) ($_GET['action'] ?? '') === 'download_summary') {
             throw new RuntimeException(LOC('api.error.summary_id_required'));
         }
 
-        $text = getDriveItemTextById($summaryId);
-        $info = getDriveItemInfoById($summaryId);
-        $filename = summaryDownloadFilename((string) ($info['name'] ?? ''), $summaryId);
+        $summariesForDownload = fetchMeetingSummaries();
+        $selectedDownloadItem = null;
+        foreach ($summariesForDownload as $item) {
+            if ((string) ($item['drive_item_id'] ?? '') === $summaryId) {
+                $selectedDownloadItem = $item;
+                break;
+            }
+        }
 
+        if ($selectedDownloadItem === null || (($selectedDownloadItem['is_openable'] ?? false) !== true)) {
+            throw new RuntimeException(LOC('api.error.invalid_summary_type'));
+        }
+
+        $text = getDriveItemTextById($summaryId);
+        if ($text === '') {
+            throw new RuntimeException(LOC('summary.load_failed', LOC('error.unexpected')));
+        }
+
+        $cachePath = getSummaryCachePath($summaryId);
+        if (is_file($cachePath)) {
+            header('Location: ' . getSummaryCacheWebPath($summaryId));
+            exit;
+        }
+
+        $filename = summaryDownloadFilename((string) ($selectedDownloadItem['name'] ?? ''), $summaryId);
         header('Content-Type: text/markdown; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('X-Content-Type-Options: nosniff');
