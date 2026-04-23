@@ -13,7 +13,8 @@
             <?php endif; ?>
 
             <?php foreach ($summaries as $item): ?>
-                <article class="summary-item <?= $selectedSummaryId === $item['drive_item_id'] ? 'active' : '' ?> <?= ($item['is_owned_by_user'] ?? false) ? 'summary-item-own' : '' ?>">
+                <article
+                    class="summary-item <?= $selectedSummaryId === $item['drive_item_id'] ? 'active' : '' ?> <?= ($item['is_owned_by_user'] ?? false) ? 'summary-item-own' : '' ?>">
                     <?php if (($item['is_openable'] ?? false) === true): ?>
                         <a class="favorite-toggle"
                             href="<?= h(appUrl('index.php', ['page' => 'summaries', 'action' => 'toggle_favorite', 'summary_id' => $item['drive_item_id'], 'is_favorite' => ($item['is_favorite'] ?? false) ? '1' : '0', 'selected_summary_id' => $selectedSummaryId])) ?>"
@@ -27,7 +28,9 @@
                         <?= h(($item['is_openable'] ?? false) ? LOC('summary.status_ready') : LOC('summary.status_unprocessed')) ?>
                     </p>
                     <?php if (($item['is_openable'] ?? false) === false): ?>
-                        <p class="muted"><?= h(LOC('summary.eta_inline', (string) ($item['eta_text'] ?? LOC('summary.eta_less_than_minute')))) ?></p>
+                        <p class="muted">
+                            <?= h(LOC('summary.eta_inline', (string) ($item['eta_text'] ?? LOC('summary.eta_less_than_minute')))) ?>
+                        </p>
                     <?php endif; ?>
                     <a class="button-secondary"
                         href="<?= h(appUrl('index.php', ['page' => 'summaries', 'summary_id' => $item['drive_item_id']])) ?>">

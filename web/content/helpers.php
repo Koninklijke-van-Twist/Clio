@@ -402,16 +402,10 @@ function parseUploadedTranscriptFile(array $file): array
         throw new RuntimeException(LOC('upload.error.invalid_extension'));
     }
 
-    $rawContent = file_get_contents($tmpName);
-    if ($rawContent === false || $rawContent === '') {
-        throw new RuntimeException(LOC('upload.error.parse_failed'));
-    }
-
     $parsed = $extension === 'txt' ? parseTxtFile($tmpName) : parseDocxFile($tmpName);
 
     $parsed['original_name'] = $name;
     $parsed['extension'] = $extension;
-    $parsed['raw_content'] = $rawContent;
 
     return $parsed;
 }

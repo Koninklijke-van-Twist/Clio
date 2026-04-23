@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') =
         $parsed = parseUploadedTranscriptFile($_FILES['transcript_file']);
         $uploadResult = uploadTranscriptToSharePoint(
             $parsed['title'],
-            (string) $parsed['raw_content'],
+            (string) $parsed['content'],
             (string) $parsed['original_name'],
             getCurrentUserEmail()
         );
