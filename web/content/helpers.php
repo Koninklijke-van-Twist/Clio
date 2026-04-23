@@ -402,11 +402,18 @@ function parseUploadedTranscriptFile(array $file): array
         throw new RuntimeException(LOC('upload.error.invalid_extension'));
     }
 
-    if ($extension === 'txt') {
-        return parseTxtFile($tmpName);
+    $rawContent = file_get_contents($tmpName);
+    if ($rawContent === false || $rawContent === '') {
+        throw new RuntimeException(LOC('upload.error.parse_failed'));
     }
 
-    return parseDocxFile($tmpName);
+    $parsed = $extension === 'txt' ? parseTxtFile($tmpName) : parseDocxFile($tmpName);
+
+    $parsed['original_name'] = $name;
+    $parsed['extension'] = $extension;
+    $parsed['raw_content'] = $rawContent;
+
+    return $parsed;
 }
 
 function sharePointRequest(string $method, string $path, ?string $accessToken, array $headers = [], ?string $body = null): array
@@ -515,6 +522,173 @@ function hasUnprocessedTranscriptStatus(mixed $value): bool
 function sortSummariesByCreatedDesc(array $items): array
 {
     usort($items, static function (array $left, array $right): int {
+        $leftTs = strtotime((string) ($left['created_at'] ?? '')) ?: 0;
+        $rightTs = strtotime((string) ($right['created_at'] ?? '')) ?: 0;
+
+        return $rightTs <=> $leftTs;
+    });
+
+    return $items;
+}
+
+function getCurrentUserEmail(): string
+{
+    return strtolower(trim((string) ($_SESSION['user']['email'] ?? '')));
+}
+
+function sanitizeUploadedFilename(string $fileName): string
+{
+    $base = trim(basename($fileName));
+    $base = preg_replace('/[\x00-\x1F]/', '', $base) ?? '';
+    $base = preg_replace('/[<>:"\/\\|?*]+/', '_', $base) ?? '';
+    $base = preg_replace('/\s+/', ' ', $base) ?? '';
+    $base = trim($base, " .\t\n\r\0\x0B");
+
+    if ($base === '') {
+        $base = 'meeting-transcript-' . date('Ymd-His') . '.txt';
+    }
+
+    return mb_substr($base, 0, 180);
+}
+
+function sanitizeEmailForFilenamePrefix(string $email): string
+{
+    $normalized = strtolower(trim($email));
+    if ($normalized === '' || !filter_var($normalized, FILTER_VALIDATE_EMAIL)) {
+        return '';
+    }
+
+    return preg_replace('/[^a-z0-9@._+\-]/', '', $normalized) ?? '';
+}
+
+function buildUploadFilenameForUser(string $originalName, string $userEmail): string
+{
+    $safeOriginal = sanitizeUploadedFilename($originalName);
+    $emailPrefix = sanitizeEmailForFilenamePrefix($userEmail);
+    if ($emailPrefix === '') {
+        return $safeOriginal;
+    }
+
+    $prefixed = $emailPrefix . '_' . $safeOriginal;
+    return mb_substr($prefixed, 0, 220);
+}
+
+function detectUploadContentType(string $filename): string
+{
+    $extension = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
+
+    if ($extension === 'docx') {
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    }
+
+    return 'text/plain; charset=utf-8';
+}
+
+function extractFirstEmailFromText(string $value): string
+{
+    if (preg_match('/[A-Z0-9][A-Z0-9._%+\-]*@[A-Z0-9.\-]+\.[A-Z]{2,}/i', $value, $matches) === 1) {
+        return strtolower(trim($matches[0], " \t\n\r\0\x0B_-"));
+    }
+
+    return '';
+}
+
+function getUserFavoritesPath(string $email): ?string
+{
+    $normalized = strtolower(trim($email));
+    if ($normalized === '' || !filter_var($normalized, FILTER_VALIDATE_EMAIL)) {
+        return null;
+    }
+
+    $safe = preg_replace('/[^a-z0-9._\-]/', '_', $normalized);
+    return __DIR__ . '/../data/favorites_' . $safe . '.json';
+}
+
+function loadUserFavoriteStates(string $email): array
+{
+    $path = getUserFavoritesPath($email);
+    if ($path === null || !is_file($path)) {
+        return [];
+    }
+
+    $json = json_decode((string) file_get_contents($path), true);
+    return is_array($json) ? $json : [];
+}
+
+function saveUserFavoriteStates(string $email, array $states): void
+{
+    $path = getUserFavoritesPath($email);
+    if ($path === null) {
+        return;
+    }
+
+    $clean = [];
+    foreach ($states as $driveItemId => $value) {
+        $key = trim((string) $driveItemId);
+        if ($key === '') {
+            continue;
+        }
+        $clean[$key] = (bool) $value;
+    }
+
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        mkdir($dir, 0750, true);
+    }
+
+    file_put_contents($path, json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+}
+
+function setUserFavoriteState(string $email, string $driveItemId, bool $state): void
+{
+    $states = loadUserFavoriteStates($email);
+    $states[$driveItemId] = $state;
+    saveUserFavoriteStates($email, $states);
+}
+
+function isSummaryOwnedByUser(string $summaryName, string $userEmail): bool
+{
+    $ownerEmail = extractFirstEmailFromText($summaryName);
+    return $ownerEmail !== '' && $ownerEmail === strtolower(trim($userEmail));
+}
+
+function isSummaryFavoritedForUser(array $item, array $favoriteStates, string $userEmail): bool
+{
+    if (($item['is_openable'] ?? false) !== true) {
+        return false;
+    }
+
+    $driveItemId = (string) ($item['drive_item_id'] ?? '');
+    if ($driveItemId !== '' && array_key_exists($driveItemId, $favoriteStates)) {
+        return (bool) $favoriteStates[$driveItemId];
+    }
+
+    return isSummaryOwnedByUser((string) ($item['name'] ?? ''), $userEmail);
+}
+
+function applyUserSummaryFlags(array $items, string $userEmail): array
+{
+    $favoriteStates = loadUserFavoriteStates($userEmail);
+
+    foreach ($items as $index => $item) {
+        $isOwned = isSummaryOwnedByUser((string) ($item['name'] ?? ''), $userEmail);
+        $items[$index]['is_owned_by_user'] = $isOwned;
+        $items[$index]['is_favorite'] = isSummaryFavoritedForUser($item, $favoriteStates, $userEmail);
+    }
+
+    return $items;
+}
+
+function sortSummariesByFavoriteThenCreatedDesc(array $items): array
+{
+    usort($items, static function (array $left, array $right): int {
+        $leftFav = ($left['is_favorite'] ?? false) === true ? 1 : 0;
+        $rightFav = ($right['is_favorite'] ?? false) === true ? 1 : 0;
+
+        if ($leftFav !== $rightFav) {
+            return $rightFav <=> $leftFav;
+        }
+
         $leftTs = strtotime((string) ($left['created_at'] ?? '')) ?: 0;
         $rightTs = strtotime((string) ($right['created_at'] ?? '')) ?: 0;
 
@@ -709,13 +883,13 @@ function addEtaToUnprocessedSummaries(array $items, ?int $nowTimestamp = null): 
     return $items;
 }
 
-function uploadTranscriptToSharePoint(string $title, string $content): array
+function uploadTranscriptToSharePoint(string $title, string $fileContent, string $originalFilename, string $uploaderEmail = ''): array
 {
     $config = getSharePointConfig();
     assertSharePointConfig($config);
     $accessToken = getSharePointAccessToken($config);
 
-    $filename = sanitizeTitleToFilename($title) . '.txt';
+    $filename = buildUploadFilenameForUser($originalFilename, $uploaderEmail);
     $folderPath = trim($config['upload_folder'], '/');
     $uploadPath = rawurlencode($filename);
     if ($folderPath !== '') {
@@ -726,8 +900,8 @@ function uploadTranscriptToSharePoint(string $title, string $content): array
         'PUT',
         '/drives/' . rawurlencode($config['drive_id']) . '/root:/' . $uploadPath . ':/content',
         $accessToken,
-        ['Content-Type: text/plain; charset=utf-8'],
-        $content
+        ['Content-Type: ' . detectUploadContentType($filename)],
+        $fileContent
     );
 
     if ($uploadResponse['status'] < 200 || $uploadResponse['status'] >= 300) {
@@ -832,8 +1006,15 @@ function fetchMeetingSummaries(): array
     }
 
     $results = sortSummariesByCreatedDesc($results);
+    $results = addEtaToUnprocessedSummaries($results);
 
-    return addEtaToUnprocessedSummaries($results);
+    $userEmail = getCurrentUserEmail();
+    if ($userEmail !== '') {
+        $results = applyUserSummaryFlags($results, $userEmail);
+        $results = sortSummariesByFavoriteThenCreatedDesc($results);
+    }
+
+    return $results;
 }
 
 function getDriveItemInfoById(string $driveItemId): array

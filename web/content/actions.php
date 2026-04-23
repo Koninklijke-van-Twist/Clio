@@ -4,6 +4,28 @@
  * Page load
  */
 
+if ((string) ($_GET['action'] ?? '') === 'toggle_favorite') {
+    $summaryId = trim((string) ($_GET['summary_id'] ?? ''));
+    $userEmail = getCurrentUserEmail();
+
+    if ($summaryId !== '' && $userEmail !== '') {
+        $favoriteStates = loadUserFavoriteStates($userEmail);
+        // Default: als nog niet expliciet opgeslagen, gebruik de weergegeven huidige staat
+        // die meegegeven wordt door de view via de query-parameter.
+        $currentState = (bool) ($favoriteStates[$summaryId] ?? (bool) (int) ($_GET['is_favorite'] ?? '0'));
+        setUserFavoriteState($userEmail, $summaryId, !$currentState);
+    }
+
+    $selectedId = trim((string) ($_GET['selected_summary_id'] ?? ''));
+    $redirectQuery = ['page' => 'summaries'];
+    if ($selectedId !== '') {
+        $redirectQuery['summary_id'] = $selectedId;
+    }
+
+    header('Location: ' . appUrl('index.php', $redirectQuery));
+    exit;
+}
+
 if ((string) ($_GET['action'] ?? '') === 'download_summary') {
     try {
         $summaryId = trim((string) ($_GET['summary_id'] ?? ''));
@@ -63,7 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') =
         }
 
         $parsed = parseUploadedTranscriptFile($_FILES['transcript_file']);
-        $uploadResult = uploadTranscriptToSharePoint($parsed['title'], $parsed['content']);
+        $uploadResult = uploadTranscriptToSharePoint(
+            $parsed['title'],
+            (string) $parsed['raw_content'],
+            (string) $parsed['original_name'],
+            getCurrentUserEmail()
+        );
 
         setFlash('success', LOC('upload.success', $uploadResult['file_name']));
     } catch (Throwable $exception) {

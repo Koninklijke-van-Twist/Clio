@@ -372,4 +372,56 @@ final class HelpersTest extends TestCase
         $this->assertSame('', $withEta[0]['eta_text']);
         $this->assertSame('ongeveer 10 minuten', $withEta[1]['eta_text']);
     }
+
+    public function testBuildUploadFilenameForUserPrefixesEmailAndKeepsOriginalName(): void
+    {
+        $result = buildUploadFilenameForUser('Teamoverleg april.docx', 'Iemand.Test@KVT.NL');
+
+        $this->assertSame('iemand.test@kvt.nl_Teamoverleg april.docx', $result);
+    }
+
+    public function testExtractFirstEmailFromTextFindsOwnerInSummaryName(): void
+    {
+        $name = 'Samenvatting _iemand.test@kvt.nl_teamoverleg april.docx';
+
+        $this->assertSame('iemand.test@kvt.nl', extractFirstEmailFromText($name));
+    }
+
+    public function testSortSummariesByFavoriteThenCreatedDescPrioritizesFavorites(): void
+    {
+        $items = [
+            [
+                'name' => 'nieuw niet-favoriet',
+                'is_favorite' => false,
+                'created_at' => '2026-04-23T12:00:00Z',
+            ],
+            [
+                'name' => 'oud favoriet',
+                'is_favorite' => true,
+                'created_at' => '2026-04-20T10:00:00Z',
+            ],
+            [
+                'name' => 'nieuw favoriet',
+                'is_favorite' => true,
+                'created_at' => '2026-04-23T11:00:00Z',
+            ],
+        ];
+
+        $sorted = sortSummariesByFavoriteThenCreatedDesc($items);
+
+        $this->assertSame('nieuw favoriet', $sorted[0]['name']);
+        $this->assertSame('oud favoriet', $sorted[1]['name']);
+        $this->assertSame('nieuw niet-favoriet', $sorted[2]['name']);
+    }
+
+    public function testIsSummaryFavoritedForUserDefaultsToOwnSummary(): void
+    {
+        $item = [
+            'drive_item_id' => 'abc',
+            'name' => 'Samenvatting _iemand.test@kvt.nl_teamoverleg april.docx',
+            'is_openable' => true,
+        ];
+
+        $this->assertTrue(isSummaryFavoritedForUser($item, [], 'iemand.test@kvt.nl'));
+    }
 }

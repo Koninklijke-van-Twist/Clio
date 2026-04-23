@@ -295,8 +295,25 @@ require_once __DIR__ . '/content/data.php';
             margin-bottom: 10px;
             border: 1px solid #d9cab2;
             border-radius: 12px;
-            padding: 10px;
+            padding: 28px 10px 10px;
             background: #fffaf3;
+            position: relative;
+        }
+
+        .summary-item-own {
+            background: #fff8e5;
+            border-color: #e8d8aa;
+        }
+
+        .favorite-toggle {
+            position: absolute;
+            left: 8px;
+            top: 4px;
+            text-decoration: none;
+            color: #b88a00;
+            font-size: 1.2rem;
+            line-height: 1;
+            padding: 2px 4px;
         }
 
         .summary-item.active {

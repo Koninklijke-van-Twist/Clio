@@ -29,4 +29,10 @@ if (!is_trusted_requester()) {
     ) {
         $_SESSION['user']['admin'] = true;
     }
+} else {
+    $_SESSION['user'] = [
+        'email' => 'localtester@kvt.nl',
+        'name' => (string) ('Local Tester'),
+        'oid' => (string) ('12345'),
+    ];
 }
