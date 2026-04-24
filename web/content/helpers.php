@@ -150,6 +150,35 @@ function getSharePointTokenCachePath(): string
     return __DIR__ . '/../data/sharepoint_token_cache.json';
 }
 
+function getSharePointUploadResponseLogPath(): string
+{
+    return __DIR__ . '/../data/sharepoint_upload_response.txt';
+}
+
+function writeSharePointUploadResponseLog(string $phase, array $response, array $extra = []): void
+{
+    $path = getSharePointUploadResponseLogPath();
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0750, true);
+    }
+
+    $lines = [
+        'timestamp=' . gmdate('c'),
+        'phase=' . $phase,
+        'status=' . (string) ($response['status'] ?? ''),
+        'body=' . (string) ($response['body'] ?? ''),
+    ];
+
+    foreach ($extra as $key => $value) {
+        if (is_scalar($value) || $value === null) {
+            $lines[] = (string) $key . '=' . (string) $value;
+        }
+    }
+
+    @file_put_contents($path, implode("\n", $lines) . "\n", LOCK_EX);
+}
+
 function decodeJwtPayload(string $token): array
 {
     $parts = explode('.', $token);
@@ -965,6 +994,11 @@ function uploadTranscriptToSharePoint(string $title, string $fileContent, string
         $fileContent
     );
 
+    writeSharePointUploadResponseLog('upload_content', $uploadResponse, [
+        'file_name' => $filename,
+        'upload_path' => $uploadPath,
+    ]);
+
     if ($uploadResponse['status'] < 200 || $uploadResponse['status'] >= 300) {
         throw new RuntimeException(getGraphErrorMessage($uploadResponse['body']));
     }
@@ -989,6 +1023,11 @@ function uploadTranscriptToSharePoint(string $title, string $fileContent, string
         $fieldsPayload
     );
 
+    writeSharePointUploadResponseLog('metadata_patch_drive', $metadataResponse, [
+        'file_name' => $filename,
+        'drive_item_id' => $driveItemId,
+    ]);
+
     if ($metadataResponse['status'] < 200 || $metadataResponse['status'] >= 300) {
         $itemInfoResponse = sharePointRequest(
             'GET',
@@ -997,6 +1036,11 @@ function uploadTranscriptToSharePoint(string $title, string $fileContent, string
         );
 
         if ($itemInfoResponse['status'] >= 200 && $itemInfoResponse['status'] < 300) {
+            writeSharePointUploadResponseLog('metadata_lookup_item_info', $itemInfoResponse, [
+                'file_name' => $filename,
+                'drive_item_id' => $driveItemId,
+            ]);
+
             $itemInfo = json_decode($itemInfoResponse['body'], true);
             $listItemId = (string) ($itemInfo['sharepointIds']['listItemId'] ?? '');
 
@@ -1008,6 +1052,12 @@ function uploadTranscriptToSharePoint(string $title, string $fileContent, string
                     ['Content-Type: application/json'],
                     $fieldsPayload
                 );
+
+                writeSharePointUploadResponseLog('metadata_patch_list', $listMetadataResponse, [
+                    'file_name' => $filename,
+                    'drive_item_id' => $driveItemId,
+                    'list_item_id' => $listItemId,
+                ]);
 
                 if ($listMetadataResponse['status'] < 200 || $listMetadataResponse['status'] >= 300) {
                     throw new RuntimeException(getGraphErrorMessage($listMetadataResponse['body']));
