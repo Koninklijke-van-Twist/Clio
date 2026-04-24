@@ -255,7 +255,7 @@ function fetchSharePointAccessTokenWithClientCredentials(array $config): array
     ];
 }
 
-function getSharePointAccessToken(array $config): string
+function getSharePointAccessToken(array $config, bool $forceRefresh = false): string
 {
     $staticToken = trim((string) ($config['access_token'] ?? ''));
     if ($staticToken !== '') {
@@ -273,7 +273,20 @@ function getSharePointAccessToken(array $config): string
     static $runtimeCache = [];
     $cacheKey = hash('sha256', $tenantId . '|' . $clientId);
 
-    if (isset($runtimeCache[$cacheKey]) && (int) $runtimeCache[$cacheKey]['expires_at'] > time()) {
+    if ($forceRefresh) {
+        unset($runtimeCache[$cacheKey]);
+
+        $cachePath = getSharePointTokenCachePath();
+        if (is_file($cachePath)) {
+            $existing = json_decode((string) file_get_contents($cachePath), true);
+            if (is_array($existing) && isset($existing[$cacheKey])) {
+                unset($existing[$cacheKey]);
+                file_put_contents($cachePath, json_encode($existing, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
+            }
+        }
+    }
+
+    if (!$forceRefresh && isset($runtimeCache[$cacheKey]) && (int) $runtimeCache[$cacheKey]['expires_at'] > time()) {
         $cachedToken = (string) $runtimeCache[$cacheKey]['access_token'];
         try {
             validateGraphTokenClaims($cachedToken);
@@ -284,7 +297,7 @@ function getSharePointAccessToken(array $config): string
     }
 
     $cachePath = getSharePointTokenCachePath();
-    if (is_file($cachePath)) {
+    if (!$forceRefresh && is_file($cachePath)) {
         $cachedJson = json_decode((string) file_get_contents($cachePath), true);
         if (is_array($cachedJson) && isset($cachedJson[$cacheKey])) {
             $cached = $cachedJson[$cacheKey];
@@ -451,7 +464,7 @@ function parseUploadedTranscriptFile(array $file): array
     return $parsed;
 }
 
-function sharePointRequest(string $method, string $path, ?string $accessToken, array $headers = [], ?string $body = null): array
+function sharePointRequest(string $method, string $path, ?string $accessToken, array $headers = [], ?string $body = null, bool $retryOnUnauthorized = true): array
 {
     $url = rtrim(SHAREPOINT_GRAPH_BASE, '/') . '/' . ltrim($path, '/');
 
@@ -494,6 +507,19 @@ function sharePointRequest(string $method, string $path, ?string $accessToken, a
 
     if ($response === false) {
         throw new RuntimeException('SharePoint request failed: ' . $error);
+    }
+
+    if ((int) $status === 401 && $retryOnUnauthorized) {
+        $config = getSharePointConfig();
+        $hasStaticToken = trim((string) ($config['access_token'] ?? '')) !== '';
+        if (!$hasStaticToken) {
+            try {
+                $freshToken = getSharePointAccessToken($config, true);
+                return sharePointRequest($method, $path, $freshToken, $headers, $body, false);
+            } catch (Throwable) {
+                // Keep the original 401 response when refresh fails.
+            }
+        }
     }
 
     return [
