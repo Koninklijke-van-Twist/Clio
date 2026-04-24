@@ -5,7 +5,7 @@
  */
 
 const APP_NAME = 'Transcript Hub';
-const MAX_UPLOAD_SIZE_BYTES = 10485760;
+const MAX_UPLOAD_SIZE_BYTES = 52428800; // 50 MB
 const ACCEPTED_UPLOAD_EXTENSIONS = ['txt', 'docx'];
 
 const SHAREPOINT_GRAPH_BASE = 'https://graph.microsoft.com/v1.0';

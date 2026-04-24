@@ -64,6 +64,12 @@ if ((string) ($_GET['action'] ?? '') === 'download_summary') {
         echo $text;
         exit;
     } catch (Throwable $exception) {
+        clioWriteErrorDump(
+            'handled_download_error',
+            $exception->getMessage(),
+            $exception->getFile(),
+            $exception->getLine()
+        );
         setFlash('error', LOC('summary.load_failed', $exception->getMessage()));
         header('Location: ' . appUrl('index.php', ['page' => 'summaries']));
         exit;
@@ -76,6 +82,22 @@ if (
     && $_POST === []
     && $_FILES === []
 ) {
+    clioWriteErrorDump(
+        'handled_upload_empty_request',
+        LOC('upload.error.request_empty'),
+        __FILE__,
+        __LINE__,
+        null,
+        [
+            'content_length' => $_SERVER['CONTENT_LENGTH'] ?? '',
+            'content_type' => $_SERVER['CONTENT_TYPE'] ?? '',
+            'upload_tmp_dir' => ini_get('upload_tmp_dir') ?: '',
+            'sys_get_temp_dir' => sys_get_temp_dir(),
+            'post_max_size' => ini_get('post_max_size') ?: '',
+            'upload_max_filesize' => ini_get('upload_max_filesize') ?: '',
+            'max_file_uploads' => ini_get('max_file_uploads') ?: '',
+        ]
+    );
     logUploadDiagnostic('empty_post_request', [
         'content_length' => $_SERVER['CONTENT_LENGTH'] ?? null,
         'content_type' => $_SERVER['CONTENT_TYPE'] ?? null,
@@ -99,11 +121,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') =
         ]);
 
         if (!isValidCsrf($_POST['csrf_token'] ?? null)) {
-            logUploadDiagnostic('upload_csrf_failed', [
-                'session_id' => session_id(),
-                'posted_token_present' => isset($_POST['csrf_token']),
-                'session_token_present' => isset($_SESSION['csrf_token']),
-            ]);
+            clioWriteErrorDump(
+                'upload_csrf_failed',
+                implode(', ', [
+                    'posted_present=' . (isset($_POST['csrf_token']) ? 'yes' : 'no'),
+                    'session_present=' . (isset($_SESSION['csrf_token']) ? 'yes' : 'no'),
+                    'posted_prefix=' . substr((string) ($_POST['csrf_token'] ?? ''), 0, 8),
+                    'session_prefix=' . substr((string) ($_SESSION['csrf_token'] ?? ''), 0, 8),
+                ]),
+                __FILE__,
+                __LINE__
+            );
             throw new RuntimeException(LOC('error.unexpected'));
         }
 
@@ -134,6 +162,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string) ($_POST['action'] ?? '') =
 
         setFlash('success', LOC('upload.success', $uploadResult['file_name']));
     } catch (Throwable $exception) {
+        clioWriteErrorDump(
+            'handled_upload_error',
+            $exception->getMessage(),
+            $exception->getFile(),
+            $exception->getLine()
+        );
         logUploadDiagnostic('upload_failed', [
             'message' => $exception->getMessage(),
             'file_error' => $_FILES['transcript_file']['error'] ?? null,

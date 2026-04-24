@@ -11,10 +11,6 @@ function h(string $value): string
 
 function safeUtf8Substr(string $value, int $start, int $length): string
 {
-    if (function_exists('mb_substr')) {
-        return (string) mb_substr($value, $start, $length, 'UTF-8');
-    }
-
     return (string) substr($value, $start, $length);
 }
 
@@ -404,6 +400,49 @@ function parseTxtFile(string $tmpFilePath): array
     ];
 }
 
+function extractTextFromDocxXml(string $xml): string
+{
+    if (trim($xml) === '') {
+        return '';
+    }
+
+    // Probeer eerst via DOMDocument: extraheer alleen <w:t> nodes,
+    // voeg een regelbreuk in na elk alinea-einde (<w:p>).
+    if (class_exists('DOMDocument')) {
+        $dom = new DOMDocument();
+        $previous = libxml_use_internal_errors(true);
+        $loaded = $dom->loadXML($xml);
+        libxml_clear_errors();
+        libxml_use_internal_errors($previous);
+
+        if ($loaded) {
+            $lines = [];
+            $paragraphs = $dom->getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 'p');
+            foreach ($paragraphs as $paragraph) {
+                $lineText = '';
+                $runs = $paragraph->getElementsByTagNameNS('http://schemas.openxmlformats.org/wordprocessingml/2006/main', 't');
+                foreach ($runs as $run) {
+                    $lineText .= $run->textContent;
+                }
+                $lines[] = $lineText;
+            }
+            $text = implode("\n", $lines);
+            $text = preg_replace('/\n{3,}/', "\n\n", $text) ?? $text;
+            $text = trim($text);
+            if ($text !== '') {
+                return $text;
+            }
+        }
+    }
+
+    // Fallback: naïeve strip_tags aanpak voor als DOMDocument faalt.
+    $xml = str_replace(['</w:p>', '</w:tr>'], ["\n", "\n"], $xml);
+    $text = strip_tags($xml);
+    $text = html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
+    $text = preg_replace('/\n{3,}/', "\n\n", (string) $text) ?? '';
+    return trim($text);
+}
+
 function parseDocxFile(string $tmpFilePath): array
 {
     $xml = false;
@@ -411,16 +450,19 @@ function parseDocxFile(string $tmpFilePath): array
     if (class_exists('ZipArchive')) {
         $zip = new ZipArchive();
         if ($zip->open($tmpFilePath) === true) {
-            $xml = $zip->getFromName('word/document.xml');
+            $raw = $zip->getFromName('word/document.xml');
             $zip->close();
+            if (is_string($raw) && trim($raw) !== '') {
+                $xml = $raw;
+            }
         }
     }
 
     if ($xml === false && function_exists('shell_exec')) {
         $escaped = escapeshellarg($tmpFilePath);
-        $xml = shell_exec('unzip -p ' . $escaped . ' word/document.xml 2>NUL');
-        if (!is_string($xml) || trim($xml) === '') {
-            $xml = shell_exec('unzip -p ' . $escaped . ' word/document.xml 2>/dev/null');
+        $raw = shell_exec('unzip -p ' . $escaped . ' word/document.xml 2>/dev/null');
+        if (is_string($raw) && trim($raw) !== '') {
+            $xml = $raw;
         }
     }
 
@@ -428,11 +470,7 @@ function parseDocxFile(string $tmpFilePath): array
         throw new RuntimeException(LOC('upload.error.docx_support'));
     }
 
-    $xml = str_replace(['</w:p>', '</w:tr>'], ["\n", "\n"], $xml);
-    $text = strip_tags($xml);
-    $text = html_entity_decode($text, ENT_QUOTES | ENT_XML1, 'UTF-8');
-    $text = preg_replace('/\n{3,}/', "\n\n", (string) $text);
-    $text = trim((string) $text);
+    $text = extractTextFromDocxXml((string) $xml);
 
     if ($text === '') {
         throw new RuntimeException(LOC('upload.error.empty_content'));
