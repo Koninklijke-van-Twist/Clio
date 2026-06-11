@@ -60,6 +60,7 @@ test('archiveRawEmail appends to existing folder matched by chain id', async () 
     assert.equal(second.folderName, first.folderName);
     assert.equal(matched, first.folderName);
     assert.equal(meta.emails.length, 2);
+    assert.equal(meta.emails[0].html_file, '0001-vraag-offerte.html');
     assert.equal(meta.contacts.find((contact) => contact.email === 'sanne@example.test').name, 'Sanne Jansen');
   } finally {
     await fs.rm(archiveRoot, { recursive: true, force: true });
@@ -85,6 +86,33 @@ test('planArchiveRawEmail calculates target without writing files', async () => 
     assert.equal(plan.folderName, 'Plan test~root@example.test');
     assert.equal(plan.emlFile, '0001-plan-test.eml');
     assert.deepEqual(entries, []);
+  } finally {
+    await fs.rm(archiveRoot, { recursive: true, force: true });
+  }
+});
+
+test('archiveRawEmail writes html body next to eml and text', async () => {
+  const archiveRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'clio-mail-html-'));
+
+  try {
+    const raw = [
+      'Message-ID: <html@example.test>',
+      'From: Sanne Jansen <sanne@example.test>',
+      'To: Clio <clio@example.test>',
+      'Subject: HTML test',
+      'Content-Type: text/html; charset=utf-8',
+      '',
+      '<p>HTML body</p>',
+    ].join('\r\n');
+
+    const result = await archiveRawEmail(Buffer.from(raw), archiveRoot);
+    const htmlPath = path.join(archiveRoot, result.folderName, result.htmlFile);
+    const metaPath = path.join(archiveRoot, result.folderName, 'meta.json');
+    const meta = JSON.parse(await fs.readFile(metaPath, 'utf8'));
+
+    assert.equal(result.htmlFile, '0001-html-test.html');
+    assert.equal(await fs.readFile(htmlPath, 'utf8'), '<p>HTML body</p>');
+    assert.equal(meta.emails[0].html_file, '0001-html-test.html');
   } finally {
     await fs.rm(archiveRoot, { recursive: true, force: true });
   }

@@ -148,6 +148,15 @@ function loadEmailArchiveThread(string $folderName): ?array
         $textPath = $threadPath . DIRECTORY_SEPARATOR . $textFile;
         $body = is_file($textPath) ? (string) file_get_contents($textPath) : '';
         $email['body_text'] = $body;
+
+        $htmlFile = basename((string) ($email['html_file'] ?? ''));
+        if ($htmlFile !== '') {
+            $htmlPath = $threadPath . DIRECTORY_SEPARATOR . $htmlFile;
+            $email['body_html'] = is_file($htmlPath) ? (string) file_get_contents($htmlPath) : '';
+        } else {
+            $email['body_html'] = '';
+        }
+
         $emails[] = $email;
     }
 

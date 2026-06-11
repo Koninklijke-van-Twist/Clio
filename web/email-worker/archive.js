@@ -102,9 +102,11 @@ export async function archiveRawEmail(rawEmail, archiveRoot) {
   const sequence = plan.sequence;
   const emlFile = plan.emlFile;
   const txtFile = plan.txtFile;
+  const htmlFile = plan.htmlFile;
 
   await fs.writeFile(path.join(folderPath, emlFile), rawEmail);
   await fs.writeFile(path.join(folderPath, txtFile), parsed.text ?? '', 'utf8');
+  await fs.writeFile(path.join(folderPath, htmlFile), normalizeHtmlBody(parsed.html), 'utf8');
 
   const contacts = collectContacts(parsed);
   mergeContacts(meta, contacts);
@@ -122,6 +124,7 @@ export async function archiveRawEmail(rawEmail, archiveRoot) {
     bcc: formatAddressList(parsed.bcc),
     eml_file: emlFile,
     text_file: txtFile,
+    html_file: htmlFile,
   });
 
   await saveMeta(folderPath, meta);
@@ -130,6 +133,7 @@ export async function archiveRawEmail(rawEmail, archiveRoot) {
     folderName,
     emlFile,
     txtFile,
+    htmlFile,
     chainId: plan.chainId,
   };
 }
@@ -158,6 +162,7 @@ export async function planArchiveRawEmail(rawEmail, archiveRoot, parsedEmail = n
     sequence,
     emlFile: `${baseName}.eml`,
     txtFile: `${baseName}.txt`,
+    htmlFile: `${baseName}.html`,
     from: formatFirstAddress(parsed.from),
     to: formatAddressList(parsed.to),
     date: parsed.date instanceof Date ? parsed.date.toISOString() : '',
@@ -257,4 +262,16 @@ function formatAddressList(addressObject) {
     const name = String(item.name ?? '').trim();
     return name !== '' ? `${name} <${email}>` : email;
   }).filter(Boolean) ?? [];
+}
+
+function normalizeHtmlBody(html) {
+  if (typeof html === 'string') {
+    return html;
+  }
+
+  if (html === false || html === null || html === undefined) {
+    return '';
+  }
+
+  return String(html);
 }

@@ -43,6 +43,7 @@ final class EmailArchiveTest extends TestCase
         mkdir($threadPath, 0750, true);
 
         file_put_contents($threadPath . DIRECTORY_SEPARATOR . '0001-project-update.txt', 'Body text');
+        file_put_contents($threadPath . DIRECTORY_SEPARATOR . '0001-project-update.html', '<p>Body html</p>');
         file_put_contents($threadPath . DIRECTORY_SEPARATOR . 'meta.json', json_encode([
             'updated_at' => '2026-06-11T10:00:00.000Z',
             'contacts' => [
@@ -55,6 +56,7 @@ final class EmailArchiveTest extends TestCase
                     'to' => ['Clio <clio@example.test>'],
                     'date' => '2026-06-11T09:55:00.000Z',
                     'text_file' => '0001-project-update.txt',
+                    'html_file' => '0001-project-update.html',
                 ],
             ],
         ], JSON_PRETTY_PRINT));
@@ -67,6 +69,7 @@ final class EmailArchiveTest extends TestCase
         $this->assertSame(1, $threads[0]['email_count']);
         $this->assertIsArray($thread);
         $this->assertSame('Body text', $thread['emails'][0]['body_text']);
+        $this->assertSame('<p>Body html</p>', $thread['emails'][0]['body_html']);
     }
 
     private function removeDirectory(string $path): void
