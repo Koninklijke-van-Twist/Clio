@@ -36,6 +36,11 @@ final class EmailArchiveTest extends TestCase
         $this->assertSame('abc-def', normalizeEmailArchiveChainId('abc~def'));
     }
 
+    public function testFormatEmailArchiveDateUsesDutchReadableFormat(): void
+    {
+        $this->assertSame('15 januari 2026, 16:34', formatEmailArchiveDate('2026-01-15 16:34:00'));
+    }
+
     public function testLoadEmailArchiveThreadsAndSelectedThread(): void
     {
         $folder = 'Project update~chain@example.test';

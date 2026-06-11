@@ -384,9 +384,23 @@ require_once __DIR__ . '/content/data.php';
         .email-message-body {
             border-top: 1px solid #ead9bf;
             padding: 12px;
-            white-space: pre-wrap;
             overflow-wrap: anywhere;
             line-height: 1.5;
+        }
+
+        .email-message-text {
+            white-space: pre-wrap;
+        }
+
+        .email-message-meta {
+            display: grid;
+            gap: 3px;
+            margin-bottom: 8px;
+            line-height: 1.25;
+        }
+
+        .email-message-meta div {
+            overflow-wrap: anywhere;
         }
 
         .email-message-html {

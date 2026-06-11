@@ -66,6 +66,32 @@ function parseEmailArchiveFolderName(string $folderName): ?array
     ];
 }
 
+function formatEmailArchiveDate(string $date): string
+{
+    $timestamp = strtotime($date);
+    if ($timestamp === false) {
+        return $date;
+    }
+
+    $months = [
+        1 => 'januari',
+        2 => 'februari',
+        3 => 'maart',
+        4 => 'april',
+        5 => 'mei',
+        6 => 'juni',
+        7 => 'juli',
+        8 => 'augustus',
+        9 => 'september',
+        10 => 'oktober',
+        11 => 'november',
+        12 => 'december',
+    ];
+
+    $month = $months[(int) date('n', $timestamp)] ?? '';
+    return date('j', $timestamp) . ' ' . $month . ' ' . date('Y, H:i', $timestamp);
+}
+
 function loadEmailArchiveThreads(): array
 {
     $root = getEmailArchiveRoot();

@@ -44,15 +44,15 @@
                     <details class="email-message" <?= $index === 0 ? 'open' : '' ?>>
                         <summary><?= h((string) ($email['subject'] ?? $selectedEmailThread['subject'])) ?></summary>
                         <div class="email-message-body">
-                            <div class="preview-meta">
+                            <div class="preview-meta email-message-meta">
                                 <?php if (!empty($email['from'])): ?>
-                                    <?= h(LOC('email.from', (string) $email['from'])) ?><br>
+                                    <div><?= h(LOC('email.from', (string) $email['from'])) ?></div>
                                 <?php endif; ?>
                                 <?php if (!empty($email['to'])): ?>
-                                    <?= h(LOC('email.to', implode(', ', (array) $email['to']))) ?><br>
+                                    <div><?= h(LOC('email.to', implode(', ', (array) $email['to']))) ?></div>
                                 <?php endif; ?>
                                 <?php if (!empty($email['date'])): ?>
-                                    <?= h(LOC('email.date', (string) $email['date'])) ?>
+                                    <div><?= h(LOC('email.date', formatEmailArchiveDate((string) $email['date']))) ?></div>
                                 <?php endif; ?>
                             </div>
                             <?php $emailHtml = trim((string) ($email['body_html'] ?? '')); ?>
@@ -62,7 +62,7 @@
                                     referrerpolicy="no-referrer"
                                     srcdoc="<?= h($emailHtml) ?>"></iframe>
                             <?php else: ?>
-                                <?= h((string) ($email['body_text'] ?? '')) ?>
+                                <div class="email-message-text"><?= h((string) ($email['body_text'] ?? '')) ?></div>
                             <?php endif; ?>
                         </div>
                     </details>
