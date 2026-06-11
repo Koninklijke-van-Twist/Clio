@@ -1,6 +1,6 @@
 {
   "pollIntervalMinutes": 10,
-  "archiveRoot": "../web/data/emails",
+  "archiveRoot": "../data/emails",
   "imap": {
     "host": "imap.example.com",
     "port": 993,

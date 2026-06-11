@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORKER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WEB_DIR="$(cd "${WORKER_DIR}/.." && pwd)"
 SERVICE_NAME="${CLIO_EMAIL_SERVICE_NAME:-clio-email-worker}"
 RUN_USER="${CLIO_EMAIL_RUN_USER:-www-data}"
 NODE_BIN="$(command -v node || true)"
@@ -25,21 +26,21 @@ fi
 NODE_BIN="$(command -v node)"
 NPM_BIN="$(command -v npm)"
 
-cd "${APP_DIR}"
+cd "${WORKER_DIR}"
 if [[ -f package-lock.json ]]; then
   "${NPM_BIN}" ci --omit=dev
 else
   "${NPM_BIN}" install --omit=dev
 fi
 
-if [[ ! -f "${APP_DIR}/email-worker/config.json" ]]; then
-  cp "${APP_DIR}/email-worker/config.example.json" "${APP_DIR}/email-worker/config.json"
-  chmod 600 "${APP_DIR}/email-worker/config.json"
-  echo "Aangemaakt: ${APP_DIR}/email-worker/config.json. Vul IMAP/SMTP instellingen in voordat de service gebruikt wordt." >&2
+if [[ ! -f "${WORKER_DIR}/config.json" ]]; then
+  cp "${WORKER_DIR}/config.example.json" "${WORKER_DIR}/config.json"
+  chmod 600 "${WORKER_DIR}/config.json"
+  echo "Aangemaakt: ${WORKER_DIR}/config.json. Vul IMAP/SMTP instellingen in voordat de service gebruikt wordt." >&2
 fi
 
-mkdir -p "${APP_DIR}/web/data/emails"
-chown -R "${RUN_USER}:${RUN_USER}" "${APP_DIR}/web/data/emails" "${APP_DIR}/email-worker/config.json"
+mkdir -p "${WEB_DIR}/data/emails"
+chown -R "${RUN_USER}:${RUN_USER}" "${WEB_DIR}/data/emails" "${WORKER_DIR}/config.json"
 
 cat >"/etc/systemd/system/${SERVICE_NAME}.service" <<SERVICE
 [Unit]
@@ -50,8 +51,8 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=${RUN_USER}
-WorkingDirectory=${APP_DIR}
-ExecStart=${NODE_BIN} ${APP_DIR}/email-worker/worker.js
+WorkingDirectory=${WORKER_DIR}
+ExecStart=${NODE_BIN} ${WORKER_DIR}/worker.js
 Restart=always
 RestartSec=30
 Environment=NODE_ENV=production

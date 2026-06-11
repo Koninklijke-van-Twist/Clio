@@ -23,14 +23,14 @@ export async function loadConfig(configPath = CONFIG_PATH) {
   const config = JSON.parse(content);
 
   if (!config.imap?.host || !config.imap?.auth?.user || !config.imap?.auth?.pass) {
-    throw new Error('IMAP configuratie ontbreekt in email-worker/config.json.');
+    throw new Error('IMAP configuratie ontbreekt in web/email-worker/config.json.');
   }
 
   return config;
 }
 
 export async function processMailbox(config) {
-  const archiveRoot = path.resolve(__dirname, config.archiveRoot ?? '../web/data/emails');
+  const archiveRoot = path.resolve(__dirname, config.archiveRoot ?? '../data/emails');
   const client = new ImapFlow({
     host: config.imap.host,
     port: config.imap.port ?? 993,

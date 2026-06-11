@@ -6,7 +6,7 @@ web/cache/
 BC Webservices.txt
 
 web/data/
-email-worker/config.json
+web/email-worker/config.json
 
 vapid-keys/
 
