@@ -79,7 +79,7 @@ export function buildGraphMessagesUrl(graphConfig, options = {}) {
   const orderDirection = options.orderDirection === 'desc' ? 'desc' : 'asc';
   const params = new URLSearchParams({
     '$top': String(Math.min(Math.max(Number(options.pageSize ?? 25), 1), 1000)),
-    '$select': 'id,subject,receivedDateTime,isRead',
+    '$select': 'id,subject,receivedDateTime,isRead,from',
     '$orderby': `receivedDateTime ${orderDirection}`,
   });
 
@@ -98,6 +98,13 @@ export async function processMailbox(config, options = {}) {
   const messages = await listGraphMessages(graph, token, fetchImpl);
 
   for (const message of messages) {
+    const senderEmail = getMessageSenderEmail(message);
+    if (!isSenderDomainAllowed(senderEmail, graph.allowedSenderDomains ?? [])) {
+      console.log(`Deleting blocked Graph message ${message.id} from ${senderEmail || 'unknown sender'}`);
+      await deleteGraphMessage(graph, token, message.id, fetchImpl);
+      continue;
+    }
+
     const rawEmail = await getGraphMessageMime(graph, token, message.id, fetchImpl);
     const result = await archiveRawEmail(rawEmail, archiveRoot);
     console.log(`Archived Graph message ${message.id} in ${result.folderName}/${result.emlFile}`);
@@ -125,6 +132,36 @@ export async function listGraphMessagesWithOptions(graphConfig, accessToken, opt
   }
 
   return messages.filter((message) => typeof message.id === 'string' && message.id !== '');
+}
+
+export function getMessageSenderEmail(message) {
+  return String(message?.from?.emailAddress?.address ?? '').trim().toLowerCase();
+}
+
+export function getEmailDomain(email) {
+  const atPosition = String(email).lastIndexOf('@');
+  if (atPosition === -1) {
+    return '';
+  }
+
+  return String(email).slice(atPosition + 1).trim().toLowerCase();
+}
+
+export function isSenderDomainAllowed(senderEmail, allowedDomains) {
+  if (!Array.isArray(allowedDomains) || allowedDomains.length === 0) {
+    return true;
+  }
+
+  const senderDomain = getEmailDomain(senderEmail);
+  if (senderDomain === '') {
+    return false;
+  }
+
+  const normalizedAllowedDomains = allowedDomains
+    .map((domain) => String(domain).trim().toLowerCase())
+    .filter(Boolean);
+
+  return normalizedAllowedDomains.includes(senderDomain);
 }
 
 export async function getGraphMessageMime(graphConfig, accessToken, messageId, fetchImpl = fetch) {

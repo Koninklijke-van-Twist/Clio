@@ -28,6 +28,9 @@ Gebruik daarna client credentials in `config.json`:
     "clientSecret": "client-secret",
     "mailbox": "clio@example.com",
     "mailFolder": "Inbox",
+    "allowedSenderDomains": [
+      "kvt.nl"
+    ],
     "pageSize": 25,
     "onlyUnread": false,
     "deleteAfterArchive": true
@@ -35,7 +38,7 @@ Gebruik daarna client credentials in `config.json`:
 }
 ```
 
-`mailbox` is de mailbox die wordt uitgelezen. `mailFolder` is de Graph folder-id of een well-known folder zoals `Inbox`.
+`mailbox` is de mailbox die wordt uitgelezen. `mailFolder` is de Graph folder-id of een well-known folder zoals `Inbox`. Als `allowedSenderDomains` gevuld is, worden mails van andere domeinen direct verwijderd zonder archivering.
 
 Installeer of update de systemd service op de server met:
 

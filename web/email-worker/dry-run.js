@@ -6,6 +6,8 @@ import { planArchiveRawEmail } from './archive.js';
 import {
   getGraphAccessToken,
   getGraphMessageMime,
+  getMessageSenderEmail,
+  isSenderDomainAllowed,
   listGraphMessagesWithOptions,
   loadConfig,
 } from './worker.js';
@@ -43,6 +45,15 @@ export async function runDryRun() {
   }
 
   for (const [index, message] of messages.entries()) {
+    const senderEmail = getMessageSenderEmail(message);
+    if (!isSenderDomainAllowed(senderEmail, config.graph.allowedSenderDomains ?? [])) {
+      console.log(`${index + 1}. ${message.subject ?? '(no subject)'}`);
+      console.log(`   from:   ${senderEmail || 'unknown sender'}`);
+      console.log('   action: would delete immediately; sender domain is not whitelisted');
+      console.log('');
+      continue;
+    }
+
     const rawEmail = await getGraphMessageMime(config.graph, token, message.id);
     const plan = await planArchiveRawEmail(rawEmail, archiveRoot);
 

@@ -7,6 +7,9 @@
     "clientSecret": "change-me",
     "mailbox": "clio@example.com",
     "mailFolder": "Inbox",
+    "allowedSenderDomains": [
+      "kvt.nl"
+    ],
     "pageSize": 25,
     "onlyUnread": false,
     "deleteAfterArchive": true,

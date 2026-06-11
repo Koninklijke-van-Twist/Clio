@@ -8,6 +8,7 @@ import {
   buildGraphMessagesUrl,
   buildMessagesUrl,
   getGraphAccessToken,
+  isSenderDomainAllowed,
   processMailbox,
 } from './worker.js';
 
@@ -43,7 +44,7 @@ test('buildMessagesUrl targets configured mailbox and folder', () => {
 
   assert.equal(
     url,
-    'https://graph.test/v1.0/users/clio%40example.test/mailFolders/Inbox/childFolders/Clio/messages?%24top=10&%24select=id%2Csubject%2CreceivedDateTime%2CisRead&%24orderby=receivedDateTime+asc&%24filter=isRead+eq+false',
+    'https://graph.test/v1.0/users/clio%40example.test/mailFolders/Inbox/childFolders/Clio/messages?%24top=10&%24select=id%2Csubject%2CreceivedDateTime%2CisRead%2Cfrom&%24orderby=receivedDateTime+asc&%24filter=isRead+eq+false',
   );
 });
 
@@ -60,8 +61,14 @@ test('buildGraphMessagesUrl can request latest messages first', () => {
 
   assert.equal(
     url,
-    'https://graph.test/v1.0/users/clio%40example.test/mailFolders/Inbox/messages?%24top=3&%24select=id%2Csubject%2CreceivedDateTime%2CisRead&%24orderby=receivedDateTime+desc',
+    'https://graph.test/v1.0/users/clio%40example.test/mailFolders/Inbox/messages?%24top=3&%24select=id%2Csubject%2CreceivedDateTime%2CisRead%2Cfrom&%24orderby=receivedDateTime+desc',
   );
+});
+
+test('isSenderDomainAllowed checks exact sender domain whitelist', () => {
+  assert.equal(isSenderDomainAllowed('abc@kvt.nl', ['kvt.nl']), true);
+  assert.equal(isSenderDomainAllowed('abc@example.test', ['kvt.nl']), false);
+  assert.equal(isSenderDomainAllowed('abc@example.test', []), true);
 });
 
 test('processMailbox archives MIME from Graph and deletes the message', async () => {
@@ -88,6 +95,7 @@ test('processMailbox archives MIME from Graph and deletes the message', async ()
         mailFolder: 'Inbox',
         graphBaseUrl: 'https://graph.test/v1.0',
         authorityHost: 'https://login.test',
+        allowedSenderDomains: ['example.test'],
       },
     }, {
       fetchImpl: async (url, options = {}) => {
@@ -97,8 +105,19 @@ test('processMailbox archives MIME from Graph and deletes the message', async ()
           return Response.json({ access_token: 'token-1' });
         }
 
-        if (String(url).endsWith('/messages?%24top=25&%24select=id%2Csubject%2CreceivedDateTime%2CisRead&%24orderby=receivedDateTime+asc')) {
-          return Response.json({ value: [{ id: 'message-1' }] });
+        if (String(url).endsWith('/messages?%24top=25&%24select=id%2Csubject%2CreceivedDateTime%2CisRead%2Cfrom&%24orderby=receivedDateTime+asc')) {
+          return Response.json({
+            value: [
+              {
+                id: 'message-1',
+                from: {
+                  emailAddress: {
+                    address: 'sanne@example.test',
+                  },
+                },
+              },
+            ],
+          });
         }
 
         if (String(url).endsWith('/messages/message-1/$value')) {
@@ -119,6 +138,61 @@ test('processMailbox archives MIME from Graph and deletes the message', async ()
     assert.equal(meta.emails.length, 1);
     assert.equal(meta.emails[0].subject, 'Graph bericht');
     assert.deepEqual(calls.map((call) => call.method), ['POST', 'GET', 'GET', 'DELETE']);
+  } finally {
+    await fs.rm(archiveRoot, { recursive: true, force: true });
+  }
+});
+
+test('processMailbox deletes blocked sender domain without downloading MIME', async () => {
+  const archiveRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'clio-graph-blocked-mail-'));
+  const calls = [];
+
+  try {
+    await processMailbox({
+      archiveRoot,
+      graph: {
+        tenantId: 'tenant-id',
+        clientId: 'client-id',
+        clientSecret: 'secret',
+        mailbox: 'clio@example.test',
+        mailFolder: 'Inbox',
+        graphBaseUrl: 'https://graph.test/v1.0',
+        authorityHost: 'https://login.test',
+        allowedSenderDomains: ['kvt.nl'],
+      },
+    }, {
+      fetchImpl: async (url, options = {}) => {
+        calls.push({ url: String(url), method: options.method ?? 'GET' });
+
+        if (String(url).includes('/oauth2/v2.0/token')) {
+          return Response.json({ access_token: 'token-1' });
+        }
+
+        if (String(url).endsWith('/messages?%24top=25&%24select=id%2Csubject%2CreceivedDateTime%2CisRead%2Cfrom&%24orderby=receivedDateTime+asc')) {
+          return Response.json({
+            value: [
+              {
+                id: 'blocked-message',
+                from: {
+                  emailAddress: {
+                    address: 'spam@example.test',
+                  },
+                },
+              },
+            ],
+          });
+        }
+
+        if (String(url).endsWith('/messages/blocked-message') && options.method === 'DELETE') {
+          return new Response(null, { status: 204 });
+        }
+
+        return new Response('unexpected request', { status: 500 });
+      },
+    });
+
+    assert.deepEqual(calls.map((call) => call.method), ['POST', 'GET', 'DELETE']);
+    assert.equal(calls.some((call) => call.url.endsWith('/$value')), false);
   } finally {
     await fs.rm(archiveRoot, { recursive: true, force: true });
   }
