@@ -7,6 +7,7 @@ import {
   archiveRawEmail,
   determineChainId,
   findThreadFolderByChainId,
+  planArchiveRawEmail,
   sanitizeChainId,
   sanitizeSubject,
 } from './archive.js';
@@ -60,6 +61,30 @@ test('archiveRawEmail appends to existing folder matched by chain id', async () 
     assert.equal(matched, first.folderName);
     assert.equal(meta.emails.length, 2);
     assert.equal(meta.contacts.find((contact) => contact.email === 'sanne@example.test').name, 'Sanne Jansen');
+  } finally {
+    await fs.rm(archiveRoot, { recursive: true, force: true });
+  }
+});
+
+test('planArchiveRawEmail calculates target without writing files', async () => {
+  const archiveRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'clio-mail-plan-'));
+
+  try {
+    const raw = [
+      'Message-ID: <root@example.test>',
+      'From: Sanne Jansen <sanne@example.test>',
+      'To: Clio <clio@example.test>',
+      'Subject: Plan test',
+      '',
+      'Body',
+    ].join('\r\n');
+
+    const plan = await planArchiveRawEmail(Buffer.from(raw), archiveRoot);
+    const entries = await fs.readdir(archiveRoot);
+
+    assert.equal(plan.folderName, 'Plan test~root@example.test');
+    assert.equal(plan.emlFile, '0001-plan-test.eml');
+    assert.deepEqual(entries, []);
   } finally {
     await fs.rm(archiveRoot, { recursive: true, force: true });
   }

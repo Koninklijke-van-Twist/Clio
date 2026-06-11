@@ -65,16 +65,25 @@ export async function getGraphAccessToken(graphConfig, fetchImpl = fetch) {
 }
 
 export function buildMessagesUrl(graphConfig) {
+  return buildGraphMessagesUrl(graphConfig, {
+    pageSize: graphConfig.pageSize ?? 25,
+    orderDirection: 'asc',
+    onlyUnread: graphConfig.onlyUnread === true,
+  });
+}
+
+export function buildGraphMessagesUrl(graphConfig, options = {}) {
   const graphBaseUrl = String(graphConfig.graphBaseUrl ?? DEFAULT_GRAPH_BASE_URL).replace(/\/+$/, '');
   const mailbox = encodeURIComponent(graphConfig.mailbox);
   const folder = encodeMailFolderPath(graphConfig.mailFolder ?? 'Inbox');
+  const orderDirection = options.orderDirection === 'desc' ? 'desc' : 'asc';
   const params = new URLSearchParams({
-    '$top': String(Math.min(Math.max(Number(graphConfig.pageSize ?? 25), 1), 1000)),
+    '$top': String(Math.min(Math.max(Number(options.pageSize ?? 25), 1), 1000)),
     '$select': 'id,subject,receivedDateTime,isRead',
-    '$orderby': 'receivedDateTime asc',
+    '$orderby': `receivedDateTime ${orderDirection}`,
   });
 
-  if (graphConfig.onlyUnread === true) {
+  if (options.onlyUnread === true) {
     params.set('$filter', 'isRead eq false');
   }
 
@@ -100,7 +109,15 @@ export async function processMailbox(config, options = {}) {
 }
 
 export async function listGraphMessages(graphConfig, accessToken, fetchImpl = fetch) {
-  const response = await graphRequest(buildMessagesUrl(graphConfig), accessToken, fetchImpl);
+  return listGraphMessagesWithOptions(graphConfig, accessToken, {}, fetchImpl);
+}
+
+export async function listGraphMessagesWithOptions(graphConfig, accessToken, options = {}, fetchImpl = fetch) {
+  const response = await graphRequest(buildGraphMessagesUrl(graphConfig, {
+    pageSize: options.pageSize ?? graphConfig.pageSize ?? 25,
+    orderDirection: options.orderDirection ?? 'asc',
+    onlyUnread: options.onlyUnread ?? graphConfig.onlyUnread === true,
+  }), accessToken, fetchImpl);
   const messages = response.value;
 
   if (!Array.isArray(messages)) {

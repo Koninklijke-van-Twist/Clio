@@ -93,37 +93,27 @@ export async function findThreadFolderByChainId(archiveRoot, chainId) {
 
 export async function archiveRawEmail(rawEmail, archiveRoot) {
   const parsed = await simpleParser(rawEmail);
-  const headers = {
-    references: parsed.references,
-    inReplyTo: parsed.inReplyTo,
-    messageId: parsed.messageId,
-  };
-  const chainId = determineChainId(headers);
-  const safeChainId = sanitizeChainId(chainId);
-  const subject = sanitizeSubject(parsed.subject);
-  const existingFolder = await findThreadFolderByChainId(archiveRoot, safeChainId);
-  const folderName = existingFolder ?? `${subject}${FOLDER_SEPARATOR}${safeChainId}`;
-  const folderPath = path.join(archiveRoot, folderName);
+  const plan = await planArchiveRawEmail(rawEmail, archiveRoot, parsed);
+  const folderName = plan.folderName;
+  const folderPath = plan.folderPath;
   await fs.mkdir(folderPath, { recursive: true });
 
   const meta = await loadMeta(folderPath);
-  const sequence = await getNextSequence(folderPath);
-  const filenamePart = sanitizeFilenamePart(subject);
-  const baseName = `${String(sequence).padStart(4, '0')}-${filenamePart}`;
-  const emlFile = `${baseName}.eml`;
-  const txtFile = `${baseName}.txt`;
+  const sequence = plan.sequence;
+  const emlFile = plan.emlFile;
+  const txtFile = plan.txtFile;
 
   await fs.writeFile(path.join(folderPath, emlFile), rawEmail);
   await fs.writeFile(path.join(folderPath, txtFile), parsed.text ?? '', 'utf8');
 
   const contacts = collectContacts(parsed);
   mergeContacts(meta, contacts);
-  meta.chain_id = safeChainId;
-  meta.subject = meta.subject ?? subject;
+  meta.chain_id = plan.chainId;
+  meta.subject = meta.subject ?? plan.subject;
   meta.updated_at = new Date().toISOString();
   meta.emails.push({
     sequence,
-    subject,
+    subject: plan.subject,
     message_id: normalizeMessageId(parsed.messageId),
     date: parsed.date instanceof Date ? parsed.date.toISOString() : '',
     from: formatFirstAddress(parsed.from),
@@ -140,7 +130,37 @@ export async function archiveRawEmail(rawEmail, archiveRoot) {
     folderName,
     emlFile,
     txtFile,
-    chainId: safeChainId,
+    chainId: plan.chainId,
+  };
+}
+
+export async function planArchiveRawEmail(rawEmail, archiveRoot, parsedEmail = null) {
+  const parsed = parsedEmail ?? await simpleParser(rawEmail);
+  const headers = {
+    references: parsed.references,
+    inReplyTo: parsed.inReplyTo,
+    messageId: parsed.messageId,
+  };
+  const chainId = sanitizeChainId(determineChainId(headers));
+  const subject = sanitizeSubject(parsed.subject);
+  const existingFolder = await findThreadFolderByChainId(archiveRoot, chainId);
+  const folderName = existingFolder ?? `${subject}${FOLDER_SEPARATOR}${chainId}`;
+  const folderPath = path.join(archiveRoot, folderName);
+  const sequence = existingFolder === null ? 1 : await getNextSequence(folderPath);
+  const filenamePart = sanitizeFilenamePart(subject);
+  const baseName = `${String(sequence).padStart(4, '0')}-${filenamePart}`;
+
+  return {
+    chainId,
+    subject,
+    folderName,
+    folderPath,
+    sequence,
+    emlFile: `${baseName}.eml`,
+    txtFile: `${baseName}.txt`,
+    from: formatFirstAddress(parsed.from),
+    to: formatAddressList(parsed.to),
+    date: parsed.date instanceof Date ? parsed.date.toISOString() : '',
   };
 }
 

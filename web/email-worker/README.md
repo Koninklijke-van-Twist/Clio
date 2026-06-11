@@ -42,3 +42,12 @@ Installeer of update de systemd service op de server met:
 ```sh
 sudo web/email-worker/install-email-worker-service.sh
 ```
+
+Test zonder wijzigingen met de laatste 3 emails:
+
+```sh
+cd web/email-worker
+npm run email:dry-run
+```
+
+Gebruik `node dry-run.js --limit=5` als je tijdelijk meer of minder berichten wilt bekijken.

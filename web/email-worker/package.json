@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test *.test.js",
+    "email:dry-run": "node dry-run.js",
     "email:once": "node worker.js --once",
     "email:worker": "node worker.js"
   },

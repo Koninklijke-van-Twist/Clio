@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 import {
   assertGraphConfig,
+  buildGraphMessagesUrl,
   buildMessagesUrl,
   getGraphAccessToken,
   processMailbox,
@@ -43,6 +44,23 @@ test('buildMessagesUrl targets configured mailbox and folder', () => {
   assert.equal(
     url,
     'https://graph.test/v1.0/users/clio%40example.test/mailFolders/Inbox/childFolders/Clio/messages?%24top=10&%24select=id%2Csubject%2CreceivedDateTime%2CisRead&%24orderby=receivedDateTime+asc&%24filter=isRead+eq+false',
+  );
+});
+
+test('buildGraphMessagesUrl can request latest messages first', () => {
+  const url = buildGraphMessagesUrl({
+    graphBaseUrl: 'https://graph.test/v1.0',
+    mailbox: 'clio@example.test',
+    mailFolder: 'Inbox',
+  }, {
+    pageSize: 3,
+    orderDirection: 'desc',
+    onlyUnread: false,
+  });
+
+  assert.equal(
+    url,
+    'https://graph.test/v1.0/users/clio%40example.test/mailFolders/Inbox/messages?%24top=3&%24select=id%2Csubject%2CreceivedDateTime%2CisRead&%24orderby=receivedDateTime+desc',
   );
 });
 
