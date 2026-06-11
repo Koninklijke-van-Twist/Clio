@@ -63,7 +63,7 @@
                             </div>
                             <?php $emailHtml = trim((string) ($email['body_html'] ?? '')); ?>
                             <?php if ($emailHtml !== ''): ?>
-                                <iframe class="email-message-html" sandbox referrerpolicy="no-referrer"
+                                <iframe class="email-message-html" sandbox="allow-same-origin" referrerpolicy="no-referrer"
                                     srcdoc="<?= h($emailHtml) ?>"></iframe>
                             <?php else: ?>
                                 <div class="email-message-text"><?= h((string) ($email['body_text'] ?? '')) ?></div>
@@ -79,24 +79,75 @@
 <script>
     (function ()
     {
-        const frames = document.querySelectorAll('.email-message-html');
-        frames.forEach(function (frame)
+        const heightPadding = 8;
+
+        function resizeEmailFrame(frame)
+        {
+            try
+            {
+                const doc = frame.contentDocument;
+                const body = doc && doc.body;
+                const html = doc && doc.documentElement;
+                if (!body || !html)
+                {
+                    return;
+                }
+
+                frame.style.height = '0px';
+                const height = Math.max(
+                    body.scrollHeight,
+                    body.offsetHeight,
+                    html.scrollHeight,
+                    html.offsetHeight
+                );
+                if (height > 0)
+                {
+                    frame.style.height = (height + heightPadding) + 'px';
+                }
+            }
+            catch (error)
+            {
+                // allow-same-origin is nodig om de iframe-inhoud te kunnen meten.
+            }
+        }
+
+        function watchEmailFrame(frame)
         {
             frame.addEventListener('load', function ()
             {
+                resizeEmailFrame(frame);
+
                 try
                 {
-                    const height = frame.contentWindow.document.documentElement.scrollHeight;
-                    if (height > 0)
+                    const body = frame.contentDocument && frame.contentDocument.body;
+                    if (body && typeof ResizeObserver !== 'undefined')
                     {
-                        frame.style.height = Math.min(Math.max(height + 20, 320), 1400) + 'px';
+                        const observer = new ResizeObserver(function ()
+                        {
+                            resizeEmailFrame(frame);
+                        });
+                        observer.observe(body);
                     }
                 }
                 catch (error)
                 {
-                    // Sandboxed mail HTML blijft bruikbaar met de vaste minimumhoogte.
+                    // ResizeObserver is optioneel; load-resize blijft werken.
                 }
             });
-        });
+
+            const details = frame.closest('details');
+            if (details)
+            {
+                details.addEventListener('toggle', function ()
+                {
+                    if (details.open)
+                    {
+                        resizeEmailFrame(frame);
+                    }
+                });
+            }
+        }
+
+        document.querySelectorAll('.email-message-html').forEach(watchEmailFrame);
     })();
 </script>
