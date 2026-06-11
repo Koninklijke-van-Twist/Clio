@@ -92,6 +92,116 @@ function formatEmailArchiveDate(string $date): string
     return date('j', $timestamp) . ' ' . $month . ' ' . date('Y, H:i', $timestamp);
 }
 
+function normalizeEmailArchiveSearchText(string $text): string
+{
+    $text = preg_replace('/\s+/u', ' ', trim($text)) ?? '';
+
+    return mb_strtolower($text, 'UTF-8');
+}
+
+function buildEmailArchiveEmailSearchText(string $threadPath, array $email): string
+{
+    $parts = [
+        (string) ($email['subject'] ?? ''),
+        (string) ($email['from'] ?? ''),
+        implode(' ', (array) ($email['to'] ?? [])),
+        implode(' ', (array) ($email['cc'] ?? [])),
+        implode(' ', (array) ($email['bcc'] ?? [])),
+    ];
+
+    $textFile = basename((string) ($email['text_file'] ?? ''));
+    if ($textFile !== '') {
+        $textPath = $threadPath . DIRECTORY_SEPARATOR . $textFile;
+        if (is_file($textPath)) {
+            $parts[] = (string) file_get_contents($textPath);
+        }
+    }
+
+    $htmlFile = basename((string) ($email['html_file'] ?? ''));
+    if ($htmlFile !== '') {
+        $htmlPath = $threadPath . DIRECTORY_SEPARATOR . $htmlFile;
+        if (is_file($htmlPath)) {
+            $parts[] = strip_tags((string) file_get_contents($htmlPath));
+        }
+    }
+
+    return normalizeEmailArchiveSearchText(implode("\n", $parts));
+}
+
+function buildEmailArchiveThreadEmailSearchTexts(string $threadPath, array $meta): array
+{
+    $texts = [];
+
+    foreach (($meta['emails'] ?? []) as $email) {
+        if (!is_array($email)) {
+            continue;
+        }
+
+        $texts[] = buildEmailArchiveEmailSearchText($threadPath, $email);
+    }
+
+    return $texts;
+}
+
+function buildEmailArchiveThreadSearchText(string $threadPath, array $meta): string
+{
+    return normalizeEmailArchiveSearchText(implode(' ', buildEmailArchiveThreadEmailSearchTexts($threadPath, $meta)));
+}
+
+function resolveEmailArchiveEmlPath(string $folderName, string $emlFile): ?string
+{
+    $parsed = parseEmailArchiveFolderName($folderName);
+    if ($parsed === null) {
+        return null;
+    }
+
+    $emlFile = basename($emlFile);
+    if ($emlFile === '' || !str_ends_with(strtolower($emlFile), '.eml')) {
+        return null;
+    }
+
+    $root = getEmailArchiveRoot();
+    $threadPath = realpath($root . DIRECTORY_SEPARATOR . $folderName);
+    $rootPath = realpath($root);
+    if ($threadPath === false || $rootPath === false || !str_starts_with($threadPath, $rootPath . DIRECTORY_SEPARATOR)) {
+        return null;
+    }
+
+    $meta = loadEmailArchiveMeta($threadPath);
+    $allowed = false;
+    foreach (($meta['emails'] ?? []) as $email) {
+        if (!is_array($email)) {
+            continue;
+        }
+
+        if (basename((string) ($email['eml_file'] ?? '')) === $emlFile) {
+            $allowed = true;
+            break;
+        }
+    }
+
+    if (!$allowed) {
+        return null;
+    }
+
+    $emlPath = $threadPath . DIRECTORY_SEPARATOR . $emlFile;
+    if (!is_file($emlPath)) {
+        return null;
+    }
+
+    return $emlPath;
+}
+
+function getEmailArchiveEmlDownloadUrl(string $folderName, string $emlFile): string
+{
+    return appUrl('index.php', [
+        'page' => 'emails',
+        'action' => 'download_email_eml',
+        'thread' => $folderName,
+        'eml' => basename($emlFile),
+    ]);
+}
+
 function formatEmailArchiveContacts(array $contacts): array
 {
     $formatted = [];
@@ -157,6 +267,8 @@ function loadEmailArchiveThreads(): array
             'path' => $path,
             'email_count' => count($meta['emails'] ?? []),
             'updated_at' => (string) ($meta['updated_at'] ?? ''),
+            'search_text' => buildEmailArchiveThreadSearchText($path, $meta),
+            'email_search_texts' => buildEmailArchiveThreadEmailSearchTexts($path, $meta),
         ];
     }
 
@@ -211,6 +323,8 @@ function loadEmailArchiveThread(string $folderName): ?array
         } else {
             $email['body_html'] = '';
         }
+
+        $email['search_text'] = buildEmailArchiveEmailSearchText($threadPath, $email);
 
         $emails[] = $email;
     }

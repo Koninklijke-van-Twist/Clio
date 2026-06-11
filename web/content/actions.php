@@ -76,6 +76,38 @@ if ((string) ($_GET['action'] ?? '') === 'download_summary') {
     }
 }
 
+if ((string) ($_GET['action'] ?? '') === 'download_email_eml') {
+    try {
+        $folderName = trim((string) ($_GET['thread'] ?? ''));
+        $emlFile = basename(trim((string) ($_GET['eml'] ?? '')));
+        if ($folderName === '' || $emlFile === '') {
+            throw new RuntimeException(LOC('email.download_failed'));
+        }
+
+        $emlPath = resolveEmailArchiveEmlPath($folderName, $emlFile);
+        if ($emlPath === null) {
+            throw new RuntimeException(LOC('email.download_failed'));
+        }
+
+        header('Content-Type: message/rfc822');
+        header('Content-Disposition: attachment; filename="' . $emlFile . '"');
+        header('Content-Length: ' . (string) filesize($emlPath));
+        header('X-Content-Type-Options: nosniff');
+        readfile($emlPath);
+        exit;
+    } catch (Throwable $exception) {
+        clioWriteErrorDump(
+            'handled_download_error',
+            $exception->getMessage(),
+            $exception->getFile(),
+            $exception->getLine()
+        );
+        setFlash('error', LOC('email.download_failed'));
+        header('Location: ' . appUrl('index.php', ['page' => 'emails']));
+        exit;
+    }
+}
+
 if (
     $_SERVER['REQUEST_METHOD'] === 'POST'
     && $page === 'upload'

@@ -307,6 +307,36 @@ require_once __DIR__ . '/content/data.php';
             gap: 10px;
         }
 
+        .email-search {
+            display: grid;
+            gap: 6px;
+            margin-bottom: 14px;
+        }
+
+        .email-search-label {
+            font-size: 0.92rem;
+            font-weight: 600;
+        }
+
+        .email-search-input {
+            width: 100%;
+            border: 1px solid #d9cab2;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font: inherit;
+            background: #fffaf3;
+            color: var(--ink);
+        }
+
+        .email-search-input:focus {
+            outline: 2px solid rgba(0, 128, 120, 0.25);
+            border-color: var(--accent);
+        }
+
+        .is-search-hidden {
+            display: none !important;
+        }
+
         .summary-item {
             margin-bottom: 10px;
             border: 1px solid #d9cab2;
@@ -391,6 +421,41 @@ require_once __DIR__ . '/content/data.php';
             cursor: pointer;
             padding: 12px;
             font-weight: 600;
+        }
+
+        .email-message-summary {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            list-style: none;
+        }
+
+        .email-message-summary::before {
+            content: '▸';
+            margin-right: 4px;
+            flex-shrink: 0;
+            color: var(--muted);
+        }
+
+        .email-message[open] > .email-message-summary::before {
+            content: '▾';
+        }
+
+        .email-message-summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .email-message-subject {
+            min-width: 0;
+        }
+
+        .email-message-download {
+            margin-top: 0;
+            flex-shrink: 0;
+            font-size: 0.85rem;
+            padding: 6px 10px;
+            white-space: nowrap;
         }
 
         .email-message-body {

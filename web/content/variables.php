@@ -23,3 +23,7 @@ $pageError = '';
 $selectedEmailThreadFolder = trim((string) ($_GET['thread'] ?? ''));
 $emailThreads = [];
 $selectedEmailThread = null;
+$emailSearchData = [
+    'threads' => [],
+    'messages' => [],
+];

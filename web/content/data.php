@@ -44,10 +44,18 @@ if ($page === 'emails') {
             $selectedEmailThreadFolder = (string) ($emailThreads[0]['folder_name'] ?? '');
         }
 
+        foreach ($emailThreads as $thread) {
+            $emailSearchData['threads'][(string) ($thread['folder_name'] ?? '')] = $thread['email_search_texts'] ?? [];
+        }
+
         if ($selectedEmailThreadFolder !== '') {
             $selectedEmailThread = loadEmailArchiveThread($selectedEmailThreadFolder);
             if ($selectedEmailThread === null) {
                 throw new RuntimeException(LOC('email.thread_not_found'));
+            }
+
+            foreach (($selectedEmailThread['emails'] ?? []) as $index => $email) {
+                $emailSearchData['messages'][(string) $index] = (string) ($email['search_text'] ?? '');
             }
         }
     } catch (Throwable $exception) {
