@@ -13,3 +13,4 @@ $_SESSION = [];
 require_once __DIR__ . '/../web/content/constants.php';
 require_once __DIR__ . '/../web/content/localization.php';
 require_once __DIR__ . '/../web/content/helpers.php';
+require_once __DIR__ . '/../web/content/email_archive.php';

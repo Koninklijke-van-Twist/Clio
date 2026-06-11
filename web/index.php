@@ -8,6 +8,7 @@ require_once __DIR__ . '/content/bootstrap.php';
 require_once __DIR__ . '/content/localization.php';
 require_once __DIR__ . '/content/constants.php';
 require_once __DIR__ . '/content/helpers.php';
+require_once __DIR__ . '/content/email_archive.php';
 require_once __DIR__ . '/content/variables.php';
 require_once __DIR__ . '/content/actions.php';
 require_once __DIR__ . '/content/data.php';
@@ -287,7 +288,18 @@ require_once __DIR__ . '/content/data.php';
             grid-template-columns: 1fr;
         }
 
+        .email-layout {
+            display: grid;
+            gap: 14px;
+            grid-template-columns: 1fr;
+        }
+
         .summary-list {
+            gap: 10px;
+        }
+
+        .email-thread-list {
+            display: grid;
             gap: 10px;
         }
 
@@ -298,6 +310,21 @@ require_once __DIR__ . '/content/data.php';
             padding: 28px 10px 10px;
             background: #fffaf3;
             position: relative;
+        }
+
+        .email-thread-link {
+            display: block;
+            border: 1px solid #d9cab2;
+            border-radius: 12px;
+            padding: 10px;
+            background: #fffaf3;
+            color: var(--ink);
+            text-decoration: none;
+        }
+
+        .email-thread-link.active {
+            border-color: var(--accent);
+            box-shadow: inset 0 0 0 1px var(--accent);
         }
 
         .summary-item-own {
@@ -331,6 +358,35 @@ require_once __DIR__ . '/content/data.php';
             border: 1px solid #ead9bf;
             border-radius: 12px;
             padding: 12px;
+        }
+
+        .email-preview {
+            background: #fffaf5;
+            border: 1px solid #ead9bf;
+            border-radius: 12px;
+            padding: 12px;
+        }
+
+        .email-message {
+            border: 1px solid #d9cab2;
+            border-radius: 12px;
+            background: #fffaf3;
+            margin-bottom: 10px;
+            overflow: hidden;
+        }
+
+        .email-message summary {
+            cursor: pointer;
+            padding: 12px;
+            font-weight: 600;
+        }
+
+        .email-message-body {
+            border-top: 1px solid #ead9bf;
+            padding: 12px;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            line-height: 1.5;
         }
 
         .preview-meta {
@@ -368,6 +424,10 @@ require_once __DIR__ . '/content/data.php';
             }
 
             .summary-layout {
+                grid-template-columns: 330px 1fr;
+            }
+
+            .email-layout {
                 grid-template-columns: 330px 1fr;
             }
         }
@@ -423,6 +483,10 @@ require_once __DIR__ . '/content/data.php';
                 href="<?= h(appUrl('index.php', ['page' => 'summaries'])) ?>">
                 <?= h(LOC('nav.summaries')) ?>
             </a>
+            <a class="tab-link <?= $page === 'emails' ? 'active' : '' ?>"
+                href="<?= h(appUrl('index.php', ['page' => 'emails'])) ?>">
+                <?= h(LOC('nav.emails')) ?>
+            </a>
         </nav>
 
         <?php if (is_array($flash) && isset($flash['type'], $flash['message'])): ?>
@@ -433,6 +497,8 @@ require_once __DIR__ . '/content/data.php';
 
         <?php if ($page === 'summaries'): ?>
             <?php require __DIR__ . '/content/views/summaries.php'; ?>
+        <?php elseif ($page === 'emails'): ?>
+            <?php require __DIR__ . '/content/views/emails.php'; ?>
         <?php else: ?>
             <?php require __DIR__ . '/content/views/upload.php'; ?>
         <?php endif; ?>

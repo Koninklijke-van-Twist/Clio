@@ -35,3 +35,22 @@ if ($page === 'summaries') {
         $pageError = LOC('summary.load_failed', $exception->getMessage());
     }
 }
+
+if ($page === 'emails') {
+    try {
+        $emailThreads = loadEmailArchiveThreads();
+
+        if ($selectedEmailThreadFolder === '' && $emailThreads !== []) {
+            $selectedEmailThreadFolder = (string) ($emailThreads[0]['folder_name'] ?? '');
+        }
+
+        if ($selectedEmailThreadFolder !== '') {
+            $selectedEmailThread = loadEmailArchiveThread($selectedEmailThreadFolder);
+            if ($selectedEmailThread === null) {
+                throw new RuntimeException(LOC('email.thread_not_found'));
+            }
+        }
+    } catch (Throwable $exception) {
+        $pageError = LOC('email.load_failed', $exception->getMessage());
+    }
+}

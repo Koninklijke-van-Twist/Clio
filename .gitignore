@@ -6,8 +6,10 @@ web/cache/
 BC Webservices.txt
 
 web/data/
+email-worker/config.json
 
 vapid-keys/
 
 vendor/
+node_modules/
 .phpunit.cache/

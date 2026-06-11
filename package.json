@@ -1,0 +1,15 @@
+{
+  "name": "clio-email-worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test email-worker/*.test.js",
+    "email:once": "node email-worker/worker.js --once",
+    "email:worker": "node email-worker/worker.js"
+  },
+  "dependencies": {
+    "imapflow": "^1.0.191",
+    "mailparser": "^3.7.4"
+  }
+}

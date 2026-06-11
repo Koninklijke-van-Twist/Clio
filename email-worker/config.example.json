@@ -1,0 +1,23 @@
+{
+  "pollIntervalMinutes": 10,
+  "archiveRoot": "../web/data/emails",
+  "imap": {
+    "host": "imap.example.com",
+    "port": 993,
+    "secure": true,
+    "auth": {
+      "user": "clio@example.com",
+      "pass": "change-me"
+    },
+    "mailbox": "INBOX"
+  },
+  "smtp": {
+    "host": "smtp.example.com",
+    "port": 587,
+    "secure": false,
+    "auth": {
+      "user": "clio@example.com",
+      "pass": "change-me"
+    }
+  }
+}

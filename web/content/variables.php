@@ -5,7 +5,7 @@
  */
 
 $page = (string) ($_GET['page'] ?? 'upload');
-if (!in_array($page, ['upload', 'summaries'], true)) {
+if (!in_array($page, ['upload', 'summaries', 'emails'], true)) {
     $page = 'upload';
 }
 
@@ -19,3 +19,7 @@ $selectedSummaryName = '';
 $selectedSummaryPendingMessage = '';
 $selectedSummaryCacheUrl = '';
 $pageError = '';
+
+$selectedEmailThreadFolder = trim((string) ($_GET['thread'] ?? ''));
+$emailThreads = [];
+$selectedEmailThread = null;
