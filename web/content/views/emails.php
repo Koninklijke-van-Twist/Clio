@@ -55,7 +55,15 @@
                                     <?= h(LOC('email.date', (string) $email['date'])) ?>
                                 <?php endif; ?>
                             </div>
-                            <?= h((string) ($email['body_text'] ?? '')) ?>
+                            <?php $emailHtml = trim((string) ($email['body_html'] ?? '')); ?>
+                            <?php if ($emailHtml !== ''): ?>
+                                <iframe class="email-message-html"
+                                    sandbox
+                                    referrerpolicy="no-referrer"
+                                    srcdoc="<?= h($emailHtml) ?>"></iframe>
+                            <?php else: ?>
+                                <?= h((string) ($email['body_text'] ?? '')) ?>
+                            <?php endif; ?>
                         </div>
                     </details>
                 <?php endforeach; ?>
@@ -63,3 +71,28 @@
         </section>
     </div>
 </section>
+
+<script>
+    (function ()
+    {
+        const frames = document.querySelectorAll('.email-message-html');
+        frames.forEach(function (frame)
+        {
+            frame.addEventListener('load', function ()
+            {
+                try
+                {
+                    const height = frame.contentWindow.document.documentElement.scrollHeight;
+                    if (height > 0)
+                    {
+                        frame.style.height = Math.min(Math.max(height + 20, 320), 1400) + 'px';
+                    }
+                }
+                catch (error)
+                {
+                    // Sandboxed mail HTML blijft bruikbaar met de vaste minimumhoogte.
+                }
+            });
+        });
+    })();
+</script>

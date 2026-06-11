@@ -389,6 +389,14 @@ require_once __DIR__ . '/content/data.php';
             line-height: 1.5;
         }
 
+        .email-message-html {
+            border: 1px solid #ead9bf;
+            border-radius: 10px;
+            width: 100%;
+            min-height: 320px;
+            background: #fff;
+        }
+
         .preview-meta {
             font-size: 0.9rem;
             color: var(--muted);
