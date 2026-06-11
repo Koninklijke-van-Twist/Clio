@@ -16,7 +16,14 @@
                 <a class="email-thread-link <?= $selectedEmailThreadFolder === $thread['folder_name'] ? 'active' : '' ?>"
                     href="<?= h(appUrl('index.php', ['page' => 'emails', 'thread' => $thread['folder_name']])) ?>">
                     <strong><?= h($thread['subject']) ?></strong><br>
-                    <span class="muted"><?= h($thread['chain_id']) ?></span><br>
+                    <?php $threadContacts = (array) ($thread['contacts'] ?? []); ?>
+                    <?php if ($threadContacts !== []): ?>
+                        <span class="email-thread-contacts muted">
+                            <?php foreach ($threadContacts as $contact): ?>
+                                <span><?= h((string) $contact) ?></span>
+                            <?php endforeach; ?>
+                        </span>
+                    <?php endif; ?>
                     <span class="muted"><?= h(LOC('email.message_count', (int) ($thread['email_count'] ?? 0))) ?></span>
                 </a>
             <?php endforeach; ?>

@@ -92,6 +92,34 @@ function formatEmailArchiveDate(string $date): string
     return date('j', $timestamp) . ' ' . $month . ' ' . date('Y, H:i', $timestamp);
 }
 
+function formatEmailArchiveContacts(array $contacts): array
+{
+    $formatted = [];
+    $seen = [];
+
+    foreach ($contacts as $contact) {
+        if (!is_array($contact)) {
+            continue;
+        }
+
+        $email = strtolower(trim((string) ($contact['email'] ?? '')));
+        if ($email === '' || isset($seen[$email])) {
+            continue;
+        }
+
+        $name = trim((string) ($contact['name'] ?? ''));
+        if ($name === '' && is_array($contact['names'] ?? null)) {
+            $name = trim((string) ($contact['names'][0] ?? ''));
+        }
+
+        $formatted[] = $name !== '' ? $name . ' <' . $email . '>' : $email;
+        $seen[$email] = true;
+    }
+
+    natcasesort($formatted);
+    return array_values($formatted);
+}
+
 function loadEmailArchiveThreads(): array
 {
     $root = getEmailArchiveRoot();
@@ -125,6 +153,7 @@ function loadEmailArchiveThreads(): array
             'folder_name' => $parsed['folder_name'],
             'subject' => $parsed['subject'],
             'chain_id' => $parsed['chain_id'],
+            'contacts' => formatEmailArchiveContacts(is_array($meta['contacts'] ?? null) ? $meta['contacts'] : []),
             'path' => $path,
             'email_count' => count($meta['emails'] ?? []),
             'updated_at' => (string) ($meta['updated_at'] ?? ''),
@@ -191,6 +220,7 @@ function loadEmailArchiveThread(string $folderName): ?array
         'subject' => $parsed['subject'],
         'chain_id' => $parsed['chain_id'],
         'contacts' => is_array($meta['contacts'] ?? null) ? $meta['contacts'] : [],
+        'contact_labels' => formatEmailArchiveContacts(is_array($meta['contacts'] ?? null) ? $meta['contacts'] : []),
         'emails' => $emails,
     ];
 }

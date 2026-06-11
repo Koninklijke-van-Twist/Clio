@@ -327,6 +327,14 @@ require_once __DIR__ . '/content/data.php';
             box-shadow: inset 0 0 0 1px var(--accent);
         }
 
+        .email-thread-contacts {
+            display: grid;
+            gap: 2px;
+            margin-top: 6px;
+            font-size: 0.88rem;
+            line-height: 1.2;
+        }
+
         .summary-item-own {
             background: #fff8e5;
             border-color: #e8d8aa;

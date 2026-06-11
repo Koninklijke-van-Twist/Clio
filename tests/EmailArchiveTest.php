@@ -53,6 +53,8 @@ final class EmailArchiveTest extends TestCase
             'updated_at' => '2026-06-11T10:00:00.000Z',
             'contacts' => [
                 ['email' => 'sanne@example.test', 'name' => 'Sanne Jansen'],
+                ['email' => 'SANNE@example.test', 'name' => 'Sanne Jansen'],
+                ['email' => 'clio@example.test', 'name' => 'Clio'],
             ],
             'emails' => [
                 [
@@ -71,8 +73,16 @@ final class EmailArchiveTest extends TestCase
 
         $this->assertCount(1, $threads);
         $this->assertSame('Project update', $threads[0]['subject']);
+        $this->assertSame([
+            'Clio <clio@example.test>',
+            'Sanne Jansen <sanne@example.test>',
+        ], $threads[0]['contacts']);
         $this->assertSame(1, $threads[0]['email_count']);
         $this->assertIsArray($thread);
+        $this->assertSame([
+            'Clio <clio@example.test>',
+            'Sanne Jansen <sanne@example.test>',
+        ], $thread['contact_labels']);
         $this->assertSame('Body text', $thread['emails'][0]['body_text']);
         $this->assertSame('<p>Body html</p>', $thread['emails'][0]['body_html']);
     }
