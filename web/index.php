@@ -67,9 +67,12 @@ require_once __DIR__ . '/content/data.php';
         }
 
         .shell {
-            max-width: 1100px;
+            max-width: 1700px;
             margin: 0 auto;
-            padding: 20px 14px 28px;
+            padding: 20px 14px 15px;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
             animation: reveal 0.5s ease;
         }
 
@@ -292,6 +295,8 @@ require_once __DIR__ . '/content/data.php';
             display: grid;
             gap: 14px;
             grid-template-columns: 1fr;
+            flex: 1;
+            min-height: 0;
         }
 
         .summary-list {
@@ -373,6 +378,14 @@ require_once __DIR__ . '/content/data.php';
             border: 1px solid #ead9bf;
             border-radius: 12px;
             padding: 12px;
+            min-height: calc(100vh - 260px);
+        }
+
+        .email-card {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: calc(100vh - 210px);
         }
 
         .email-message {
@@ -415,7 +428,7 @@ require_once __DIR__ . '/content/data.php';
             border: 1px solid #ead9bf;
             border-radius: 10px;
             width: 100%;
-            min-height: 320px;
+            min-height: min(900px, calc(100vh - 360px));
             background: #fff;
         }
 

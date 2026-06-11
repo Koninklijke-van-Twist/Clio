@@ -1,6 +1,5 @@
 <section class="card email-card">
     <h2><?= h(LOC('email.title')) ?></h2>
-    <p class="muted"><?= h(LOC('email.description')) ?></p>
 
     <?php if ($pageError !== ''): ?>
         <div class="flash flash-error"><?= h($pageError) ?></div>
@@ -64,9 +63,7 @@
                             </div>
                             <?php $emailHtml = trim((string) ($email['body_html'] ?? '')); ?>
                             <?php if ($emailHtml !== ''): ?>
-                                <iframe class="email-message-html"
-                                    sandbox
-                                    referrerpolicy="no-referrer"
+                                <iframe class="email-message-html" sandbox referrerpolicy="no-referrer"
                                     srcdoc="<?= h($emailHtml) ?>"></iframe>
                             <?php else: ?>
                                 <div class="email-message-text"><?= h((string) ($email['body_text'] ?? '')) ?></div>
