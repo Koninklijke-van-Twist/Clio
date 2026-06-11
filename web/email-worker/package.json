@@ -9,7 +9,6 @@
     "email:worker": "node worker.js"
   },
   "dependencies": {
-    "imapflow": "^1.0.191",
     "mailparser": "^3.7.4"
   }
 }

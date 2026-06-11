@@ -25,6 +25,12 @@ fi
 
 NODE_BIN="$(command -v node)"
 NPM_BIN="$(command -v npm)"
+NODE_MAJOR="$("${NODE_BIN}" -p "Number(process.versions.node.split('.')[0])")"
+
+if [[ "${NODE_MAJOR}" -lt 18 ]]; then
+  echo "NodeJS 18 of nieuwer is vereist voor de Graph worker. Gevonden: $("${NODE_BIN}" --version)." >&2
+  exit 1
+fi
 
 cd "${WORKER_DIR}"
 if [[ -f package-lock.json ]]; then

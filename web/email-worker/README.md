@@ -9,6 +9,34 @@ Behoud bij deploys of uploads altijd deze serverbestanden:
 
 `config.json` bevat mailboxconfiguratie en staat bewust niet in Git. `web/data/emails/` bevat het gearchiveerde emailarchief en wordt door de worker aangemaakt als de map nog niet bestaat.
 
+## Microsoft Graph configuratie
+
+Maak in Entra ID een app registration aan met application permissions voor Microsoft Graph:
+
+- `Mail.ReadWrite`
+- Admin consent voor de tenant
+
+Gebruik daarna client credentials in `config.json`:
+
+```json
+{
+  "pollIntervalMinutes": 10,
+  "archiveRoot": "../data/emails",
+  "graph": {
+    "tenantId": "tenant-id",
+    "clientId": "app-client-id",
+    "clientSecret": "client-secret",
+    "mailbox": "clio@example.com",
+    "mailFolder": "Inbox",
+    "pageSize": 25,
+    "onlyUnread": false,
+    "deleteAfterArchive": true
+  }
+}
+```
+
+`mailbox` is de mailbox die wordt uitgelezen. `mailFolder` is de Graph folder-id of een well-known folder zoals `Inbox`.
+
 Installeer of update de systemd service op de server met:
 
 ```sh
