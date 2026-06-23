@@ -135,6 +135,8 @@ export async function archiveRawEmail(rawEmail, archiveRoot) {
     txtFile,
     htmlFile,
     chainId: plan.chainId,
+    subject: plan.subject,
+    from: plan.from,
   };
 }
 

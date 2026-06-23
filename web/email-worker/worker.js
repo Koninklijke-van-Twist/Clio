@@ -4,6 +4,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { archiveRawEmail } from './archive.js';
+import { sendArchiveNotifications } from './mail-notify.js';
+import { handleProjectSharePointUpload, extractProjectNumber } from './project.js';
 
 /**
  * Consts
@@ -108,6 +110,53 @@ export async function processMailbox(config, options = {}) {
     const rawEmail = await getGraphMessageMime(graph, token, message.id, fetchImpl);
     const result = await archiveRawEmail(rawEmail, archiveRoot);
     console.log(`Archived Graph message ${message.id} in ${result.folderName}/${result.emlFile}`);
+
+    let projectResult = { handled: false };
+    try {
+      projectResult = await handleProjectSharePointUpload(
+        config,
+        token,
+        message.subject ?? result.subject,
+        result.emlFile,
+        rawEmail,
+        fetchImpl,
+      );
+
+      if (projectResult.handled === true) {
+        if (projectResult.uploaded === true) {
+          console.log(`Uploaded ${result.emlFile} to SharePoint project ${projectResult.projectNumber} (${projectResult.projectFolder.description})`);
+        } else {
+          console.log(`SharePoint upload skipped for project ${projectResult.projectNumber}: ${projectResult.reason ?? 'unknown'}`);
+        }
+      }
+    } catch (error) {
+      console.error(`SharePoint handling failed for message ${message.id}:`, error);
+      if (extractProjectNumber(message.subject ?? result.subject) !== null) {
+        projectResult = {
+          handled: true,
+          projectNumber: extractProjectNumber(message.subject ?? result.subject),
+          uploaded: false,
+          reason: 'sharepoint_error',
+        };
+      }
+    }
+
+    try {
+      const notificationResult = await sendArchiveNotifications(
+        graph,
+        token,
+        message,
+        result,
+        projectResult,
+        fetchImpl,
+      );
+
+      if (notificationResult.sent === true) {
+        console.log(`Sent ${notificationResult.type} notification to ${notificationResult.recipient}`);
+      }
+    } catch (error) {
+      console.error(`Notification failed for message ${message.id}:`, error);
+    }
 
     if (graph.deleteAfterArchive !== false) {
       await deleteGraphMessage(graph, token, message.id, fetchImpl);

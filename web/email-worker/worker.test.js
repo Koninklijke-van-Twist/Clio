@@ -124,6 +124,10 @@ test('processMailbox archives MIME from Graph and deletes the message', async ()
           return new Response(rawEmail);
         }
 
+        if (String(url).endsWith('/sendMail') && options.method === 'POST') {
+          return new Response(null, { status: 202 });
+        }
+
         if (String(url).endsWith('/messages/message-1') && options.method === 'DELETE') {
           return new Response(null, { status: 204 });
         }
@@ -137,7 +141,7 @@ test('processMailbox archives MIME from Graph and deletes the message', async ()
 
     assert.equal(meta.emails.length, 1);
     assert.equal(meta.emails[0].subject, 'Graph bericht');
-    assert.deepEqual(calls.map((call) => call.method), ['POST', 'GET', 'GET', 'DELETE']);
+    assert.deepEqual(calls.map((call) => call.method), ['POST', 'GET', 'GET', 'POST', 'DELETE']);
   } finally {
     await fs.rm(archiveRoot, { recursive: true, force: true });
   }

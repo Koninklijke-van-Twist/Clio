@@ -1,6 +1,13 @@
 {
   "pollIntervalMinutes": 10,
   "archiveRoot": "../data/emails",
+  "sharepoint": {
+    "enabled": true,
+    "siteHostname": "kvtnl.sharepoint.com",
+    "sitePath": "/sites/BCDocumentRepository",
+    "projectsFolder": "Projects",
+    "driveId": ""
+  },
   "graph": {
     "tenantId": "00000000-0000-0000-0000-000000000000",
     "clientId": "00000000-0000-0000-0000-000000000000",
@@ -13,6 +20,9 @@
     "pageSize": 25,
     "onlyUnread": false,
     "deleteAfterArchive": true,
+    "notifications": {
+      "enabled": true
+    },
     "authorityHost": "https://login.microsoftonline.com",
     "graphBaseUrl": "https://graph.microsoft.com/v1.0"
   }
