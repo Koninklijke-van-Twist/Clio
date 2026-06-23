@@ -16,7 +16,7 @@ export function extractProjectNumber(subject) {
     return prjMatch[1].toUpperCase();
   }
 
-  const legacyMatch = text.match(/\b(15\d{6})\b/);
+  const legacyMatch = text.match(/\b(15\d{4})\b/);
   if (legacyMatch) {
     return legacyMatch[1];
   }

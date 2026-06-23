@@ -19,10 +19,11 @@ import {
 test('extractProjectNumber matches PRJ and 15 project numbers', () => {
   assert.equal(extractProjectNumber('Update voor PRJ123456 offerte'), 'PRJ123456');
   assert.equal(extractProjectNumber('Project PRJ123456789 document'), 'PRJ123456789');
-  assert.equal(extractProjectNumber('Legacy project 15123456 info'), '15123456');
+  assert.equal(extractProjectNumber('Legacy project 151234 info'), '151234');
   assert.equal(extractProjectNumber('Geen projectnummer'), null);
   assert.equal(extractProjectNumber('PRJ12345 te kort'), null);
-  assert.equal(extractProjectNumber('1512345 te kort'), null);
+  assert.equal(extractProjectNumber('15123 te kort'), null);
+  assert.equal(extractProjectNumber('1512345 te lang'), null);
 });
 
 test('parseProjectFolderName extracts description from folder name', () => {
@@ -154,7 +155,7 @@ test('uploadEmlToProjectFolder puts file in project folder', async () => {
     projectsFolder: 'Projects',
     graphBaseUrl: 'https://graph.test/v1.0',
   }, 'token-1', {
-    folderName: '15123456_Legacy',
+    folderName: '151234_Legacy',
     description: 'Legacy',
   }, '0001-mail.eml', Buffer.from('eml'), async (url, options) => {
     uploadUrl = url;
@@ -164,6 +165,6 @@ test('uploadEmlToProjectFolder puts file in project folder', async () => {
 
   assert.equal(
     uploadUrl,
-    'https://graph.test/v1.0/drives/drive-1/root:/Projects/15123456_Legacy/0001-mail.eml:/content',
+    'https://graph.test/v1.0/drives/drive-1/root:/Projects/151234_Legacy/0001-mail.eml:/content',
   );
 });

@@ -54,7 +54,7 @@ Gebruik daarna client credentials in `config.json`:
 
 ## Projectnummers en SharePoint
 
-Als het onderwerp `PRJ` gevolgd door 6-9 cijfers of `15` gevolgd door 6 cijfers bevat, probeert de worker na archivering alleen het `.eml`-bestand te uploaden naar:
+Als het onderwerp `PRJ` gevolgd door 6-9 cijfers of een 6-cijferig nummer dat begint met `15` bevat, probeert de worker na archivering alleen het `.eml`-bestand te uploaden naar:
 
 `https://kvtnl.sharepoint.com/sites/BCDocumentRepository/Projects/<nr>_<desc>`
 
