@@ -6,8 +6,8 @@ test.afterEach(() => {
   clearIctUsersCache();
 });
 
-test('loadIctUsers reads normalized emails from auth.php', async () => {
-  const users = await loadIctUsers({ reload: true });
+test('loadIctUsers reads normalized emails from mock-auth.php', async () => {
+  const users = await loadIctUsers({ reload: true, useMockAuth: true });
   assert.ok(Array.isArray(users));
   assert.ok(users.includes('tfalken@kvt.nl'));
   assert.ok(users.every((email) => email === email.toLowerCase()));

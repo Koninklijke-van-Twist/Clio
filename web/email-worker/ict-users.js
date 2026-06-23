@@ -17,9 +17,15 @@ export async function loadIctUsers(options = {}) {
   const phpBinary = String(options.phpBinary ?? 'php').trim() || 'php';
 
   try {
+    const env = { ...process.env };
+    if (options.useMockAuth === true) {
+      env.CLIO_USE_MOCK_AUTH = '1';
+    }
+
     const { stdout } = await execFileAsync(phpBinary, [ICT_USERS_SCRIPT], {
       cwd: __dirname,
       maxBuffer: 1024 * 1024,
+      env,
     });
     const parsed = JSON.parse(String(stdout).trim());
     cachedIctUsers = Array.isArray(parsed)

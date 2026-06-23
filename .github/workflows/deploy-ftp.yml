@@ -39,6 +39,8 @@ jobs:
 
       - name: Run email worker tests
         working-directory: web/email-worker
+        env:
+          CLIO_USE_MOCK_AUTH: '1'
         run: npm test
 
   deploy:

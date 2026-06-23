@@ -2,6 +2,9 @@
 
 declare(strict_types=1);
 
+putenv('CLIO_USE_MOCK_AUTH=1');
+$_ENV['CLIO_USE_MOCK_AUTH'] = '1';
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
