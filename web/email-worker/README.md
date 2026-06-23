@@ -58,7 +58,7 @@ Als het onderwerp `PRJ` gevolgd door 6-9 cijfers of een 6-cijferig nummer dat be
 
 `https://kvtnl.sharepoint.com/sites/BCDocumentRepository/Projects/<nr>_<desc>`
 
-De worker zoekt een bestaande map die begint met `<nr>_`. Bestaat die map niet, dan krijgt alleen de afzender een melding dat SharePoint-upload niet lukte maar Clio-archivering wel. Bij succes krijgt alleen de afzender een bevestiging met projectnummer en mapnaam.
+De worker zoekt een bestaande map die begint met `<nr>_`. Bestaat die map niet, dan krijgt alleen de afzender een melding dat SharePoint-upload niet lukte maar Clio-archivering wel. Bij succes wordt het `.eml`-bestand geplaatst in `<nr>_<desc>/016_CORRESPONDENCE/` (de submap wordt automatisch aangemaakt als die nog niet bestaat) en krijgen de metadatavelden `Job No.` en `KVT Sales Quote Description` de juiste waarden.
 
 ### SharePoint configuratie
 

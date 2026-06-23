@@ -3,6 +3,11 @@
  */
 
 const DEFAULT_GRAPH_BASE_URL = 'https://graph.microsoft.com/v1.0';
+const DEFAULT_CORRESPONDENCE_FOLDER = '016_CORRESPONDENCE';
+const DEFAULT_METADATA_FIELDS = {
+  jobNo: 'Job No.',
+  description: 'KVT Sales Quote Description',
+};
 
 /**
  * Public methods
@@ -49,6 +54,38 @@ export function encodeSharePointPath(...segments) {
     .filter(Boolean)
     .map((segment) => encodeURIComponent(segment))
     .join('/');
+}
+
+export function getCorrespondenceFolderPath(sharepointConfig) {
+  const configured = String(sharepointConfig?.correspondenceFolder ?? DEFAULT_CORRESPONDENCE_FOLDER).trim();
+  return configured !== '' ? configured : DEFAULT_CORRESPONDENCE_FOLDER;
+}
+
+export function getSharePointMetadataFieldNames(sharepointConfig) {
+  const configured = sharepointConfig?.metadataFields ?? {};
+
+  return {
+    jobNo: String(configured.jobNo ?? DEFAULT_METADATA_FIELDS.jobNo).trim() || DEFAULT_METADATA_FIELDS.jobNo,
+    description: String(configured.description ?? DEFAULT_METADATA_FIELDS.description).trim() || DEFAULT_METADATA_FIELDS.description,
+  };
+}
+
+export function buildProjectUploadPathSegments(sharepointConfig, projectFolder, emlFileName) {
+  return [
+    getProjectsFolderPath(sharepointConfig),
+    projectFolder.folderName,
+    getCorrespondenceFolderPath(sharepointConfig),
+    emlFileName,
+  ];
+}
+
+export function buildSharePointMetadataPayload(sharepointConfig, projectNumber, description) {
+  const fieldNames = getSharePointMetadataFieldNames(sharepointConfig);
+
+  return {
+    [fieldNames.jobNo]: String(projectNumber),
+    [fieldNames.description]: String(description),
+  };
 }
 
 export function getProjectsFolderPath(sharepointConfig) {
@@ -143,22 +180,17 @@ export async function findProjectFolder(sharepointConfig, accessToken, projectNu
   return matches[0];
 }
 
-export async function uploadEmlToProjectFolder(sharepointConfig, accessToken, projectFolder, emlFileName, emlContent, fetchImpl = fetch) {
+export async function uploadEmlToProjectFolder(sharepointConfig, accessToken, projectFolder, projectNumber, emlFileName, emlContent, fetchImpl = fetch) {
   const driveId = await resolveSharePointDriveId(sharepointConfig, accessToken, fetchImpl);
-  const projectsFolder = getProjectsFolderPath(sharepointConfig);
   const graphBaseUrl = String(sharepointConfig.graphBaseUrl ?? DEFAULT_GRAPH_BASE_URL).replace(/\/+$/, '');
-  const url = buildDriveUploadUrl(
-    graphBaseUrl,
-    driveId,
-    projectsFolder,
-    projectFolder.folderName,
-    emlFileName,
-  );
+  const uploadPathSegments = buildProjectUploadPathSegments(sharepointConfig, projectFolder, emlFileName);
+  const url = buildDriveUploadUrl(graphBaseUrl, driveId, ...uploadPathSegments);
   const response = await fetchImpl(url, {
     method: 'PUT',
     headers: {
       Authorization: `Bearer ${accessToken}`,
       'Content-Type': 'message/rfc822',
+      Accept: 'application/json',
     },
     body: emlContent,
   });
@@ -168,7 +200,40 @@ export async function uploadEmlToProjectFolder(sharepointConfig, accessToken, pr
     throw new Error(`SharePoint upload failed (${response.status}): ${errorText}`);
   }
 
-  return encodeSharePointPath(projectsFolder, projectFolder.folderName, emlFileName);
+  const uploadJson = await response.json().catch(() => ({}));
+  const driveItemId = String(uploadJson?.id ?? '').trim();
+  if (driveItemId === '') {
+    throw new Error('SharePoint upload response bevat geen drive item id.');
+  }
+
+  await updateDriveItemMetadata(
+    graphBaseUrl,
+    driveId,
+    driveItemId,
+    buildSharePointMetadataPayload(sharepointConfig, projectNumber, projectFolder.description),
+    accessToken,
+    fetchImpl,
+  );
+
+  return encodeSharePointPath(...uploadPathSegments);
+}
+
+async function updateDriveItemMetadata(graphBaseUrl, driveId, driveItemId, fields, accessToken, fetchImpl) {
+  const url = `${graphBaseUrl}/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(driveItemId)}/listItem/fields`;
+  const response = await fetchImpl(url, {
+    method: 'PATCH',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(fields),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`SharePoint metadata update failed (${response.status}): ${errorText}`);
+  }
 }
 
 export async function handleProjectSharePointUpload(config, accessToken, subject, emlFileName, emlContent, fetchImpl = fetch) {
@@ -197,6 +262,7 @@ export async function handleProjectSharePointUpload(config, accessToken, subject
       sharepointConfig,
       accessToken,
       projectFolder,
+      projectNumber,
       emlFileName,
       emlContent,
       fetchImpl,

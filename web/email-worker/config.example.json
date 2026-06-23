@@ -5,6 +5,11 @@
     "enabled": true,
     "driveId": "b!...",
     "projectsFolder": "",
+    "correspondenceFolder": "016_CORRESPONDENCE",
+    "metadataFields": {
+      "jobNo": "Job No.",
+      "description": "KVT Sales Quote Description"
+    },
     "siteId": "",
     "siteHostname": "kvtnl.sharepoint.com",
     "sitePath": "/sites/BCDocumentRepository"
