@@ -7,7 +7,8 @@
     "test": "node --test *.test.js",
     "email:dry-run": "node dry-run.js",
     "email:once": "node worker.js --once",
-    "email:worker": "node worker.js"
+    "email:worker": "node worker.js",
+    "email:sharepoint-diagnose": "node sharepoint-diagnose.js"
   },
   "dependencies": {
     "mailparser": "^3.7.4"

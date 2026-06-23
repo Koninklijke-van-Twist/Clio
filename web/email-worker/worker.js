@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { archiveRawEmail } from './archive.js';
 import { sendArchiveNotifications } from './mail-notify.js';
+import { loadIctUsers } from './ict-users.js';
 import { handleProjectSharePointUpload, extractProjectNumber } from './project.js';
 
 /**
@@ -98,6 +99,9 @@ export async function processMailbox(config, options = {}) {
   const graph = config.graph;
   const token = await getGraphAccessToken(graph, fetchImpl);
   const messages = await listGraphMessages(graph, token, fetchImpl);
+  const ictUsers = Array.isArray(config.ictUsers)
+    ? config.ictUsers
+    : await loadIctUsers();
 
   for (const message of messages) {
     const senderEmail = getMessageSenderEmail(message);
@@ -118,6 +122,8 @@ export async function processMailbox(config, options = {}) {
     if (detectedProjectNumber !== null) {
       console.log(`Detected project number ${detectedProjectNumber} in subject "${subjectForProject}"`);
     }
+
+    let processingErrors = [];
 
     try {
       projectResult = await handleProjectSharePointUpload(
@@ -140,24 +146,28 @@ export async function processMailbox(config, options = {}) {
         console.log(`No project number found in subject "${subjectForProject}"; SharePoint upload skipped`);
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`SharePoint handling failed for message ${message.id}:`, error);
+      processingErrors.push(errorMessage);
       if (extractProjectNumber(subjectForProject) !== null) {
         projectResult = {
           handled: true,
           projectNumber: extractProjectNumber(subjectForProject),
           uploaded: false,
           reason: 'sharepoint_error',
+          error: errorMessage,
         };
       }
     }
 
     try {
       const notificationResult = await sendArchiveNotifications(
-        graph,
+        { ...config, ictUsers },
         token,
         message,
         result,
         projectResult,
+        { processingErrors },
         fetchImpl,
       );
 
@@ -165,7 +175,9 @@ export async function processMailbox(config, options = {}) {
         console.log(`Sent ${notificationResult.type} notification to ${notificationResult.recipient}`);
       }
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error(`Notification failed for message ${message.id}:`, error);
+      processingErrors.push(`Notificatie versturen mislukt: ${errorMessage}`);
     }
 
     if (graph.deleteAfterArchive !== false) {

@@ -96,14 +96,67 @@ export function getProjectsFolderPath(sharepointConfig) {
   return String(sharepointConfig?.driveId ?? '').trim() !== '' ? '' : 'Projects';
 }
 
+export function mapMetadataFieldsToColumnNames(columns, fields) {
+  const byDisplayName = new Map();
+
+  for (const column of columns) {
+    const internalName = String(column?.name ?? '').trim();
+    const displayName = String(column?.displayName ?? '').trim();
+    if (internalName !== '') {
+      byDisplayName.set(internalName.toLowerCase(), internalName);
+    }
+    if (displayName !== '') {
+      byDisplayName.set(displayName.toLowerCase(), internalName);
+    }
+  }
+
+  const mapped = {};
+  for (const [fieldName, value] of Object.entries(fields)) {
+    const internalName = byDisplayName.get(String(fieldName).toLowerCase());
+    mapped[internalName ?? fieldName] = value;
+  }
+
+  return mapped;
+}
+
+export async function listDriveFolderChildren(graphBaseUrl, driveId, projectsFolder, accessToken, fetchImpl = fetch) {
+  const url = buildDriveChildrenUrl(graphBaseUrl, driveId, projectsFolder);
+  const items = [];
+  let nextUrl = url;
+
+  while (nextUrl) {
+    const response = await fetchImpl(nextUrl, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        Accept: 'application/json',
+      },
+    });
+    const json = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      throw new Error(`SharePoint folder listing failed (${response.status}): ${JSON.stringify(json)}`);
+    }
+
+    if (Array.isArray(json.value)) {
+      items.push(...json.value);
+    }
+
+    nextUrl = typeof json['@odata.nextLink'] === 'string' && json['@odata.nextLink'] !== ''
+      ? json['@odata.nextLink']
+      : null;
+  }
+
+  return items;
+}
+
 export function buildDriveChildrenUrl(graphBaseUrl, driveId, projectsFolder) {
   const base = `${graphBaseUrl}/drives/${encodeURIComponent(driveId)}`;
   const folderPath = encodeSharePointPath(projectsFolder);
   if (folderPath === '') {
-    return `${base}/root/children?$select=name,folder`;
+    return `${base}/root/children?$select=name,folder&$top=999`;
   }
 
-  return `${base}/root:/${folderPath}:/children?$select=name,folder`;
+  return `${base}/root:/${folderPath}:/children?$select=name,folder&$top=999`;
 }
 
 export function buildDriveUploadUrl(graphBaseUrl, driveId, ...pathSegments) {
@@ -153,21 +206,9 @@ export async function findProjectFolder(sharepointConfig, accessToken, projectNu
   const driveId = await resolveSharePointDriveId(sharepointConfig, accessToken, fetchImpl);
   const projectsFolder = getProjectsFolderPath(sharepointConfig);
   const graphBaseUrl = String(sharepointConfig.graphBaseUrl ?? DEFAULT_GRAPH_BASE_URL).replace(/\/+$/, '');
-  const url = buildDriveChildrenUrl(graphBaseUrl, driveId, projectsFolder);
-  const response = await fetchImpl(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: 'application/json',
-    },
-  });
-  const json = await response.json().catch(() => ({}));
+  const children = await listDriveFolderChildren(graphBaseUrl, driveId, projectsFolder, accessToken, fetchImpl);
 
-  if (!response.ok) {
-    throw new Error(`SharePoint folder listing failed (${response.status}): ${JSON.stringify(json)}`);
-  }
-
-  const prefix = `${projectNumber}_`.toLowerCase();
-  const matches = (Array.isArray(json.value) ? json.value : [])
+  const matches = children
     .filter((item) => item?.folder && typeof item.name === 'string')
     .map((item) => parseProjectFolderName(item.name, projectNumber))
     .filter(Boolean)
@@ -206,7 +247,8 @@ export async function uploadEmlToProjectFolder(sharepointConfig, accessToken, pr
     throw new Error('SharePoint upload response bevat geen drive item id.');
   }
 
-  await updateDriveItemMetadata(
+  const metadataResult = await updateDriveItemMetadata(
+    sharepointConfig,
     graphBaseUrl,
     driveId,
     driveItemId,
@@ -215,24 +257,63 @@ export async function uploadEmlToProjectFolder(sharepointConfig, accessToken, pr
     fetchImpl,
   );
 
-  return encodeSharePointPath(...uploadPathSegments);
+  return {
+    uploadPath: encodeSharePointPath(...uploadPathSegments),
+    metadataUpdated: metadataResult.updated,
+    metadataError: metadataResult.error ?? '',
+  };
 }
 
-async function updateDriveItemMetadata(graphBaseUrl, driveId, driveItemId, fields, accessToken, fetchImpl) {
-  const url = `${graphBaseUrl}/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(driveItemId)}/listItem/fields`;
+export async function loadDriveListColumns(graphBaseUrl, driveId, accessToken, fetchImpl = fetch) {
+  const url = `${graphBaseUrl}/drives/${encodeURIComponent(driveId)}/list/columns?$select=name,displayName`;
   const response = await fetchImpl(url, {
-    method: 'PATCH',
     headers: {
       Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
       Accept: 'application/json',
     },
-    body: JSON.stringify(fields),
   });
+  const json = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`SharePoint metadata update failed (${response.status}): ${errorText}`);
+    throw new Error(`SharePoint column lookup failed (${response.status}): ${JSON.stringify(json)}`);
+  }
+
+  return Array.isArray(json.value) ? json.value : [];
+}
+
+async function updateDriveItemMetadata(sharepointConfig, graphBaseUrl, driveId, driveItemId, fields, accessToken, fetchImpl) {
+  try {
+    const columns = await loadDriveListColumns(graphBaseUrl, driveId, accessToken, fetchImpl);
+    const mappedFields = mapMetadataFieldsToColumnNames(columns, fields);
+    const url = `${graphBaseUrl}/drives/${encodeURIComponent(driveId)}/items/${encodeURIComponent(driveItemId)}/listItem/fields`;
+    const response = await fetchImpl(url, {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(mappedFields),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`SharePoint metadata update failed (${response.status}): ${errorText}`);
+    }
+
+    return { updated: true };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(`SharePoint metadata update skipped for item ${driveItemId}: ${message}`);
+
+    if (sharepointConfig.requireMetadata === true) {
+      throw error;
+    }
+
+    return {
+      updated: false,
+      error: message,
+    };
   }
 }
 
@@ -258,7 +339,7 @@ export async function handleProjectSharePointUpload(config, accessToken, subject
   }
 
   try {
-    await uploadEmlToProjectFolder(
+    const uploadResult = await uploadEmlToProjectFolder(
       sharepointConfig,
       accessToken,
       projectFolder,
@@ -273,6 +354,9 @@ export async function handleProjectSharePointUpload(config, accessToken, subject
       projectNumber,
       uploaded: true,
       projectFolder,
+      uploadPath: uploadResult.uploadPath,
+      metadataUpdated: uploadResult.metadataUpdated,
+      metadataError: uploadResult.metadataError,
     };
   } catch (error) {
     return {

@@ -78,6 +78,8 @@ Kies de drive waar de map `Projects` onder staat en zet die ID in `sharepoint.dr
 
 Voor overige e-mails stuurt de worker alleen naar de afzender een bevestiging dat de mail in Clio gearchiveerd is. CC en andere ontvangers krijgen geen automatische reactie.
 
+Afzenders uit `$ictUsers` in `auth.php` krijgen in de bevestigingsmail een extra ICT-diagnoseblok met volledige SharePoint-foutcodes en verwerkingsdetails. De email-worker leest die lijst via `ict-users.php` direct uit `auth.php`; je hoeft ze niet in `config.json` te dupliceren.
+
 Installeer of update de systemd service op de server met:
 
 ```sh

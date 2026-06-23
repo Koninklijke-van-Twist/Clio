@@ -18,6 +18,8 @@ import {
   getCorrespondenceFolderPath,
   getProjectsFolderPath,
   handleProjectSharePointUpload,
+  listDriveFolderChildren,
+  mapMetadataFieldsToColumnNames,
   parseProjectFolderName,
   resolveSharePointDriveId,
   uploadEmlToProjectFolder,
@@ -58,6 +60,19 @@ test('buildProjectUploadPathSegments includes correspondence subfolder', () => {
   );
 });
 
+test('mapMetadataFieldsToColumnNames resolves display names to internal names', () => {
+  assert.deepEqual(mapMetadataFieldsToColumnNames([
+    { name: 'Job_x0020_No', displayName: 'Job No.' },
+    { name: 'KVT_x0020_Sales_x0020_Quote_x0020_Description', displayName: 'KVT Sales Quote Description' },
+  ], {
+    'Job No.': '153703',
+    'KVT Sales Quote Description': 'Demo',
+  }), {
+    Job_x0020_No: '153703',
+    KVT_x0020_Sales_x0020_Quote_x0020_Description: 'Demo',
+  });
+});
+
 test('buildSharePointMetadataPayload maps job number and description', () => {
   assert.deepEqual(buildSharePointMetadataPayload({}, '153703', 'Demo Project'), {
     'Job No.': '153703',
@@ -79,11 +94,11 @@ test('getProjectsFolderPath uses drive root when driveId is configured', () => {
 test('buildDriveChildrenUrl targets drive root when projectsFolder is empty', () => {
   assert.equal(
     buildDriveChildrenUrl('https://graph.test/v1.0', 'drive-1', ''),
-    'https://graph.test/v1.0/drives/drive-1/root/children?$select=name,folder',
+    'https://graph.test/v1.0/drives/drive-1/root/children?$select=name,folder&$top=999',
   );
   assert.equal(
     buildDriveChildrenUrl('https://graph.test/v1.0', 'drive-1', 'Projects'),
-    'https://graph.test/v1.0/drives/drive-1/root:/Projects:/children?$select=name,folder',
+    'https://graph.test/v1.0/drives/drive-1/root:/Projects:/children?$select=name,folder&$top=999',
   );
 });
 
@@ -95,7 +110,7 @@ test('findProjectFolder can list project folders from Projects library root', as
   }, 'token-1', '153703', async (url) => {
     assert.equal(
       url,
-      'https://graph.test/v1.0/drives/drive-projects/root/children?$select=name,folder',
+      'https://graph.test/v1.0/drives/drive-projects/root/children?$select=name,folder&$top=999',
     );
 
     return Response.json({
@@ -117,7 +132,7 @@ test('findProjectFolder returns first matching project folder', async () => {
   }, 'token-1', 'PRJ123456', async (url) => {
     assert.equal(
       url,
-      'https://graph.test/v1.0/drives/drive-1/root:/Projects:/children?$select=name,folder',
+      'https://graph.test/v1.0/drives/drive-1/root:/Projects:/children?$select=name,folder&$top=999',
     );
 
     return Response.json({
@@ -159,6 +174,15 @@ test('handleProjectSharePointUpload uploads only eml when project folder exists'
       return Response.json({ id: 'item-1' }, { status: 201 });
     }
 
+    if (String(url).includes('/list/columns?')) {
+      return Response.json({
+        value: [
+          { name: 'Job_x0020_No', displayName: 'Job No.' },
+          { name: 'KVT_x0020_Sales_x0020_Quote_x0020_Description', displayName: 'KVT Sales Quote Description' },
+        ],
+      });
+    }
+
     if (String(url).includes('/items/item-1/listItem/fields') && options.method === 'PATCH') {
       return new Response(null, { status: 200 });
     }
@@ -174,6 +198,9 @@ test('handleProjectSharePointUpload uploads only eml when project folder exists'
       folderName: 'PRJ123456_Demo',
       description: 'Demo',
     },
+    uploadPath: 'Projects/PRJ123456_Demo/016_CORRESPONDENCE/0001-test.eml',
+    metadataUpdated: true,
+    metadataError: '',
   });
   assert.equal(calls.some((call) => call.method === 'PUT'), true);
   assert.equal(calls.some((call) => call.method === 'PATCH'), true);
@@ -250,7 +277,7 @@ test('resolveSharePointDriveId can resolve drive via siteId', async () => {
 
 test('uploadEmlToProjectFolder uploads to correspondence folder and sets metadata', async () => {
   const calls = [];
-  const path = await uploadEmlToProjectFolder({
+  const result = await uploadEmlToProjectFolder({
     driveId: 'drive-1',
     projectsFolder: '',
     graphBaseUrl: 'https://graph.test/v1.0',
@@ -262,6 +289,15 @@ test('uploadEmlToProjectFolder uploads to correspondence folder and sets metadat
 
     if (options.method === 'PUT') {
       return Response.json({ id: 'item-42' }, { status: 201 });
+    }
+
+    if (String(url).includes('/list/columns?')) {
+      return Response.json({
+        value: [
+          { name: 'Job_x0020_No', displayName: 'Job No.' },
+          { name: 'KVT_x0020_Sales_x0020_Quote_x0020_Description', displayName: 'KVT Sales Quote Description' },
+        ],
+      });
     }
 
     if (options.method === 'PATCH') {
@@ -276,14 +312,15 @@ test('uploadEmlToProjectFolder uploads to correspondence folder and sets metadat
     'https://graph.test/v1.0/drives/drive-1/root:/151234_Legacy/016_CORRESPONDENCE/0001-mail.eml:/content',
   );
   assert.equal(
-    calls[1].url,
+    calls.find((call) => call.method === 'PATCH').url,
     'https://graph.test/v1.0/drives/drive-1/items/item-42/listItem/fields',
   );
-  assert.deepEqual(JSON.parse(calls[1].body), {
-    'Job No.': '151234',
-    'KVT Sales Quote Description': 'Legacy',
+  assert.deepEqual(JSON.parse(calls.find((call) => call.method === 'PATCH').body), {
+    Job_x0020_No: '151234',
+    KVT_x0020_Sales_x0020_Quote_x0020_Description: 'Legacy',
   });
-  assert.equal(path, '151234_Legacy/016_CORRESPONDENCE/0001-mail.eml');
+  assert.equal(result.uploadPath, '151234_Legacy/016_CORRESPONDENCE/0001-mail.eml');
+  assert.equal(result.metadataUpdated, true);
 });
 
 test('buildDriveUploadUrl supports nested projects folder', () => {
