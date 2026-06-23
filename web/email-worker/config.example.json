@@ -1,6 +1,7 @@
 {
   "pollIntervalMinutes": 10,
   "archiveRoot": "../data/emails",
+  "clioWebUrl": "https://sleutels.kvt.nl/clio",
   "sharepoint": {
     "enabled": true,
     "driveId": "b!...",

@@ -1,5 +1,6 @@
 import {
   buildArchiveOnlyNotification,
+  buildClioEmailThreadUrl,
   buildClioNotificationEmail,
   buildProjectUploadFailedNotification,
   buildProjectUploadSuccessNotification,
@@ -37,7 +38,7 @@ export function isIctUser(senderEmail, ictUsers) {
     .includes(normalized);
 }
 
-export function buildIctDiagnosticLines({ graphMessage, archiveResult, projectResult, processingErrors = [] }) {
+export function buildIctDiagnosticLines({ graphMessage, archiveResult, projectResult, processingErrors = [], clioUrl = '' }) {
   const lines = [];
 
   if (graphMessage?.id) {
@@ -48,6 +49,9 @@ export function buildIctDiagnosticLines({ graphMessage, archiveResult, projectRe
   }
   if (archiveResult?.folderName && archiveResult?.emlFile) {
     lines.push(`Clio archief: ${archiveResult.folderName}/${archiveResult.emlFile}`);
+  }
+  if (clioUrl) {
+    lines.push(`Clio URL: ${clioUrl}`);
   }
 
   if (projectResult?.handled === true) {
@@ -113,29 +117,41 @@ export function buildReplySubject(originalSubject) {
   return /^re:/i.test(subject) ? subject : `Re: ${subject}`;
 }
 
-export function buildArchiveOnlyBody() {
-  return buildArchiveOnlyNotification().plainText;
+export function buildArchiveOnlyBody(clioUrl = '') {
+  return buildArchiveOnlyNotification(clioUrl).plainText;
 }
 
-export function buildProjectUploadFailedBody(projectNumber, reason = 'folder_not_found') {
-  return buildProjectUploadFailedNotification(projectNumber, reason).plainText;
+export function buildProjectUploadFailedBody(projectNumber, reason = 'folder_not_found', clioUrl = '') {
+  return buildProjectUploadFailedNotification(projectNumber, reason, clioUrl).plainText;
 }
 
-export function buildProjectUploadSuccessBody(projectNumber, description, fileUrl = '') {
-  return buildProjectUploadSuccessNotification(projectNumber, description, fileUrl).plainText;
+export function buildProjectUploadSuccessBody(projectNumber, description, sharePointUrl = '', clioUrl = '') {
+  return buildProjectUploadSuccessNotification(projectNumber, description, sharePointUrl, clioUrl).plainText;
 }
 
-export function buildNotificationMessage(projectResult, options = {}) {
+export function resolveClioWebUrl(workerConfig) {
+  const graphConfig = workerConfig.graph ?? workerConfig;
+  return String(
+    workerConfig.clioWebUrl
+    ?? graphConfig.clioWebUrl
+    ?? workerConfig.notifications?.clioWebUrl
+    ?? graphConfig.notifications?.clioWebUrl
+    ?? '',
+  ).trim();
+}
+
+export function buildNotificationMessage(projectResult, archiveResult, options = {}) {
   const diagnosticLines = Array.isArray(options.diagnosticLines) ? options.diagnosticLines : [];
+  const clioUrl = buildClioEmailThreadUrl(options.clioWebUrl, archiveResult?.folderName);
   let paragraphs = [];
-  let fileUrl = '';
+  let sharePointUrl = '';
 
   if (projectResult?.handled === true) {
     if (projectResult.uploaded === true && projectResult.projectFolder) {
       paragraphs = [
         `Uw e-mail is geplaatst in SharePoint onder projectnummer ${projectResult.projectNumber} (${projectResult.projectFolder.description}) en gearchiveerd in Clio.`,
       ];
-      fileUrl = String(projectResult.fileUrl ?? '').trim();
+      sharePointUrl = String(projectResult.fileUrl ?? '').trim();
     } else {
       const intro = projectResult.reason === 'folder_not_found'
         ? `Uw e-mail met projectnummer ${projectResult.projectNumber} kon niet automatisch in SharePoint worden geplaatst, omdat er geen bijbehorende projectmap is gevonden.`
@@ -151,7 +167,8 @@ export function buildNotificationMessage(projectResult, options = {}) {
 
   return buildClioNotificationEmail({
     paragraphs,
-    fileUrl,
+    clioUrl,
+    sharePointUrl,
     diagnosticLines,
   });
 }
@@ -219,15 +236,21 @@ export async function sendArchiveNotifications(workerConfig, accessToken, graphM
   const ictUsers = workerConfig.ictUsers ?? [];
   const includeIctDiagnostics = isIctUser(sender.email, ictUsers);
   const replySubject = buildReplySubject(graphMessage?.subject ?? archiveResult?.subject ?? '');
+  const clioWebUrl = resolveClioWebUrl(workerConfig);
+  const clioUrl = buildClioEmailThreadUrl(clioWebUrl, archiveResult?.folderName);
   const diagnosticLines = includeIctDiagnostics
     ? buildIctDiagnosticLines({
       graphMessage,
       archiveResult,
       projectResult,
       processingErrors: options.processingErrors ?? [],
+      clioUrl,
     })
     : [];
-  const notification = buildNotificationMessage(projectResult, { diagnosticLines });
+  const notification = buildNotificationMessage(projectResult, archiveResult, {
+    diagnosticLines,
+    clioWebUrl,
+  });
 
   await sendMailToSender(graphConfig, accessToken, {
     toEmail: sender.email,

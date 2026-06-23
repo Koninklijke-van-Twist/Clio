@@ -47,15 +47,11 @@
             <?php if ($selectedEmailThread === null): ?>
                 <p class="muted"><?= h(LOC('email.preview_placeholder')) ?></p>
             <?php else: ?>
-                <?php $contacts = $selectedEmailThread['contacts'] ?? []; ?>
-                <?php if (is_array($contacts) && $contacts !== []): ?>
+                <?php $contactLabels = $selectedEmailThread['contact_labels'] ?? []; ?>
+                <?php if ($contactLabels !== []): ?>
                     <div class="preview-meta">
                         <strong><?= h(LOC('email.contacts')) ?>:</strong>
-                        <?= h(implode(', ', array_map(static function (array $contact): string {
-                            $name = trim((string) ($contact['name'] ?? ''));
-                            $email = trim((string) ($contact['email'] ?? ''));
-                            return $name !== '' ? $name . ' <' . $email . '>' : $email;
-                        }, $contacts))) ?>
+                        <?= h(implode(', ', $contactLabels)) ?>
                     </div>
                 <?php endif; ?>
 

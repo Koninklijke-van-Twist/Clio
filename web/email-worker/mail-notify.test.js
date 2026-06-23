@@ -39,6 +39,7 @@ test('sendArchiveNotifications appends ICT diagnostics for configured users', as
   let sentBody = '';
   let contentType = '';
   const result = await sendArchiveNotifications({
+    clioWebUrl: 'https://sleutels.kvt.nl/clio',
     ictUsers: ['tfalken@kvt.nl'],
     graph: {
       mailbox: 'clio@example.test',
@@ -67,6 +68,7 @@ test('sendArchiveNotifications appends ICT diagnostics for configured users', as
   assert.equal(contentType, 'HTML');
   assert.match(sentBody, /ICT diagnose/);
   assert.match(sentBody, /SharePoint reden: folder_not_found/);
+  assert.match(sentBody, /Bekijk op Clio/);
   assert.doesNotMatch(sentBody, /Technische details:/);
 });
 
@@ -74,6 +76,7 @@ test('sendArchiveNotifications keeps normal body for non-ICT users', async () =>
   let sentBody = '';
   let contentType = '';
   await sendArchiveNotifications({
+    clioWebUrl: 'https://sleutels.kvt.nl/clio',
     ictUsers: ['tfalken@kvt.nl'],
     graph: {
       mailbox: 'clio@example.test',
@@ -99,6 +102,7 @@ test('sendArchiveNotifications keeps normal body for non-ICT users', async () =>
   });
 
   assert.equal(contentType, 'HTML');
+  assert.match(sentBody, /Bekijk op Clio/);
   assert.doesNotMatch(sentBody, /ICT diagnose/);
   assert.doesNotMatch(sentBody, /403/);
 });

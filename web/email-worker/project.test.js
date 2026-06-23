@@ -238,8 +238,12 @@ test('notification bodies cover archive and project outcomes', () => {
   assert.match(buildProjectUploadFailedBody('PRJ123456'), /PRJ123456/);
   assert.match(buildProjectUploadSuccessBody('PRJ123456', 'Demo'), /PRJ123456 \(Demo\)/);
   assert.match(
-    buildProjectUploadSuccessBody('PRJ123456', 'Demo', 'https://example.test/file.eml'),
-    /https:\/\/example\.test\/file\.eml/,
+    buildProjectUploadSuccessBody('PRJ123456', 'Demo', 'https://example.test/file.eml', 'https://example.test/clio'),
+    /Bekijk op SharePoint: https:\/\/example\.test\/file\.eml/,
+  );
+  assert.match(
+    buildArchiveOnlyBody('https://example.test/clio'),
+    /Bekijk op Clio: https:\/\/example\.test\/clio/,
   );
   assert.equal(buildReplySubject('Offerte'), 'Re: Offerte');
   assert.equal(buildReplySubject('Re: Offerte'), 'Re: Offerte');

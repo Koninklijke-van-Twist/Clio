@@ -202,12 +202,49 @@ function getEmailArchiveEmlDownloadUrl(string $folderName, string $emlFile): str
     ]);
 }
 
+function getEmailArchiveMailboxAddress(): string
+{
+    $mailSettings = $GLOBALS['mailSettings'] ?? null;
+    if (!is_array($mailSettings)) {
+        return '';
+    }
+
+    return strtolower(trim((string) ($mailSettings['from_email'] ?? '')));
+}
+
+function filterEmailArchiveContacts(array $contacts): array
+{
+    $mailbox = getEmailArchiveMailboxAddress();
+    $filtered = [];
+    $seen = [];
+
+    foreach ($contacts as $contact) {
+        if (!is_array($contact)) {
+            continue;
+        }
+
+        $email = strtolower(trim((string) ($contact['email'] ?? '')));
+        if ($email === '' || isset($seen[$email])) {
+            continue;
+        }
+
+        if ($mailbox !== '' && $email === $mailbox) {
+            continue;
+        }
+
+        $seen[$email] = true;
+        $filtered[] = $contact;
+    }
+
+    return $filtered;
+}
+
 function formatEmailArchiveContacts(array $contacts): array
 {
     $formatted = [];
     $seen = [];
 
-    foreach ($contacts as $contact) {
+    foreach (filterEmailArchiveContacts($contacts) as $contact) {
         if (!is_array($contact)) {
             continue;
         }
@@ -333,7 +370,7 @@ function loadEmailArchiveThread(string $folderName): ?array
         'folder_name' => $parsed['folder_name'],
         'subject' => $parsed['subject'],
         'chain_id' => $parsed['chain_id'],
-        'contacts' => is_array($meta['contacts'] ?? null) ? $meta['contacts'] : [],
+        'contacts' => filterEmailArchiveContacts(is_array($meta['contacts'] ?? null) ? $meta['contacts'] : []),
         'contact_labels' => formatEmailArchiveContacts(is_array($meta['contacts'] ?? null) ? $meta['contacts'] : []),
         'emails' => $emails,
     ];

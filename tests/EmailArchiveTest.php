@@ -14,6 +14,10 @@ final class EmailArchiveTest extends TestCase
         $_GET = [];
         $_POST = [];
 
+        $GLOBALS['mailSettings'] = [
+            'from_email' => 'clio@example.test',
+        ];
+
         $this->archiveRoot = sys_get_temp_dir() . '/clio_email_archive_' . bin2hex(random_bytes(6));
         mkdir($this->archiveRoot, 0750, true);
         $GLOBALS['emailArchiveRoot'] = $this->archiveRoot;
@@ -22,7 +26,7 @@ final class EmailArchiveTest extends TestCase
     protected function tearDown(): void
     {
         $this->removeDirectory($this->archiveRoot);
-        unset($GLOBALS['emailArchiveRoot']);
+        unset($GLOBALS['emailArchiveRoot'], $GLOBALS['mailSettings']);
     }
 
     public function testSanitizeEmailArchiveSubjectReplacesSeparator(): void
@@ -39,6 +43,24 @@ final class EmailArchiveTest extends TestCase
     public function testFormatEmailArchiveDateUsesDutchReadableFormat(): void
     {
         $this->assertSame('15 januari 2026, 16:34', formatEmailArchiveDate('2026-01-15 16:34:00'));
+    }
+
+    public function testFormatEmailArchiveContactsExcludesConfiguredMailboxAddress(): void
+    {
+        $contacts = [
+            ['email' => 'clio@example.test', 'name' => 'Clio'],
+            ['email' => 'sanne@example.test', 'name' => 'Sanne Jansen'],
+        ];
+
+        $this->assertSame([
+            'Sanne Jansen <sanne@example.test>',
+        ], formatEmailArchiveContacts($contacts));
+
+        unset($GLOBALS['mailSettings']);
+        $this->assertSame([
+            'Clio <clio@example.test>',
+            'Sanne Jansen <sanne@example.test>',
+        ], formatEmailArchiveContacts($contacts));
     }
 
     public function testLoadEmailArchiveThreadsAndSelectedThread(): void
@@ -76,15 +98,19 @@ final class EmailArchiveTest extends TestCase
         $this->assertCount(1, $threads);
         $this->assertSame('Project update', $threads[0]['subject']);
         $this->assertSame([
-            'Clio <clio@example.test>',
             'Sanne Jansen <sanne@example.test>',
         ], $threads[0]['contacts']);
         $this->assertSame(1, $threads[0]['email_count']);
         $this->assertIsArray($thread);
         $this->assertSame([
-            'Clio <clio@example.test>',
             'Sanne Jansen <sanne@example.test>',
         ], $thread['contact_labels']);
+        $this->assertSame([
+            [
+                'email' => 'sanne@example.test',
+                'name' => 'Sanne Jansen',
+            ],
+        ], $thread['contacts']);
         $this->assertSame('Body text', $thread['emails'][0]['body_text']);
         $this->assertSame('<p>Body html</p>', $thread['emails'][0]['body_html']);
         $this->assertStringContainsString('body text', (string) $threads[0]['search_text']);

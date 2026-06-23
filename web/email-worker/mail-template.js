@@ -17,6 +17,18 @@ const CLIO_COLORS = {
 const FONT_SANS = "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif";
 const FONT_SERIF = "Georgia, 'Times New Roman', serif";
 
+const ACTION_BUTTON_STYLE = [
+  'display:inline-block',
+  'margin:0 8px 8px 0',
+  `padding:10px 18px`,
+  `background-color:${CLIO_COLORS.accent}`,
+  'color:#ffffff',
+  'text-decoration:none',
+  'border-radius:999px',
+  'font-weight:600',
+  'font-size:14px',
+].join(';');
+
 /**
  * Public methods
  */
@@ -30,12 +42,64 @@ export function escapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-export function buildClioNotificationEmail({ paragraphs = [], fileUrl = '', diagnosticLines = [] } = {}) {
-  const normalizedParagraphs = paragraphs.map((paragraph) => String(paragraph).trim()).filter(Boolean);
-  const plainParts = [...normalizedParagraphs];
-  if (fileUrl) {
-    plainParts.push('', `Bestand in SharePoint: ${fileUrl}`);
+export function buildClioEmailThreadUrl(clioWebUrl, folderName) {
+  const baseUrl = String(clioWebUrl ?? '').trim().replace(/\/+$/, '');
+  const thread = String(folderName ?? '').trim();
+  if (baseUrl === '' || thread === '') {
+    return '';
   }
+
+  const params = new URLSearchParams({
+    page: 'emails',
+    thread,
+  });
+
+  return `${baseUrl}/index.php?${params.toString()}`;
+}
+
+export function buildNotificationActionLinks({ clioUrl = '', sharePointUrl = '' } = {}) {
+  const links = [];
+  const normalizedClioUrl = String(clioUrl ?? '').trim();
+  const normalizedSharePointUrl = String(sharePointUrl ?? '').trim();
+
+  if (normalizedClioUrl !== '') {
+    links.push({ label: 'Bekijk op Clio', url: normalizedClioUrl });
+  }
+  if (normalizedSharePointUrl !== '') {
+    links.push({ label: 'Bekijk op SharePoint', url: normalizedSharePointUrl });
+  }
+
+  return links;
+}
+
+function buildActionLinksHtml(links) {
+  if (!Array.isArray(links) || links.length === 0) {
+    return '';
+  }
+
+  const buttons = links.map((link) => (
+    `<a href="${escapeHtml(link.url)}" style="${ACTION_BUTTON_STYLE}">${escapeHtml(link.label)}</a>`
+  )).join('');
+
+  return `<div style="margin:16px 0 0;">${buttons}</div>`;
+}
+
+function appendActionLinksToPlainText(plainParts, links) {
+  for (const link of links) {
+    plainParts.push('', `${link.label}: ${link.url}`);
+  }
+}
+
+export function buildClioNotificationEmail({
+  paragraphs = [],
+  clioUrl = '',
+  sharePointUrl = '',
+  diagnosticLines = [],
+} = {}) {
+  const normalizedParagraphs = paragraphs.map((paragraph) => String(paragraph).trim()).filter(Boolean);
+  const actionLinks = buildNotificationActionLinks({ clioUrl, sharePointUrl });
+  const plainParts = [...normalizedParagraphs];
+  appendActionLinksToPlainText(plainParts, actionLinks);
   plainParts.push('', 'Met vriendelijke groet,', 'Clio');
 
   if (Array.isArray(diagnosticLines) && diagnosticLines.length > 0) {
@@ -48,16 +112,7 @@ export function buildClioNotificationEmail({ paragraphs = [], fileUrl = '', diag
     ))
     .join('');
 
-  const fileLinkHtml = fileUrl
-    ? [
-      `<p style="margin:0 0 8px;font-size:15px;line-height:1.55;color:${CLIO_COLORS.ink};">`,
-      `<a href="${escapeHtml(fileUrl)}" style="display:inline-block;padding:10px 18px;background-color:${CLIO_COLORS.accent};color:#ffffff;text-decoration:none;border-radius:999px;font-weight:600;font-size:14px;">Bekijk bestand in SharePoint</a>`,
-      '</p>',
-      `<p style="margin:0 0 14px;font-size:13px;line-height:1.5;color:${CLIO_COLORS.muted};word-break:break-all;">`,
-      `<a href="${escapeHtml(fileUrl)}" style="color:${CLIO_COLORS.accentStrong};text-decoration:underline;">${escapeHtml(fileUrl)}</a>`,
-      '</p>',
-    ].join('')
-    : '';
+  const actionLinksHtml = buildActionLinksHtml(actionLinks);
 
   const diagnosticHtml = Array.isArray(diagnosticLines) && diagnosticLines.length > 0
     ? [
@@ -85,7 +140,7 @@ export function buildClioNotificationEmail({ paragraphs = [], fileUrl = '', diag
     `<td style="padding:24px 28px;font-family:${FONT_SANS};color:${CLIO_COLORS.ink};">`,
     `<h1 style="margin:0 0 18px;font-family:${FONT_SERIF};font-size:24px;line-height:1.2;color:${CLIO_COLORS.accent};">Clio</h1>`,
     paragraphHtml,
-    fileLinkHtml,
+    actionLinksHtml,
     `<p style="margin:18px 0 0;font-size:15px;line-height:1.55;color:${CLIO_COLORS.ink};">Met vriendelijke groet,<br><strong>Clio</strong></p>`,
     diagnosticHtml,
     '</td>',
@@ -104,13 +159,14 @@ export function buildClioNotificationEmail({ paragraphs = [], fileUrl = '', diag
   };
 }
 
-export function buildArchiveOnlyNotification() {
+export function buildArchiveOnlyNotification(clioUrl = '') {
   return buildClioNotificationEmail({
     paragraphs: ['Uw e-mail is succesvol gearchiveerd in Clio.'],
+    clioUrl,
   });
 }
 
-export function buildProjectUploadFailedNotification(projectNumber, reason = 'folder_not_found') {
+export function buildProjectUploadFailedNotification(projectNumber, reason = 'folder_not_found', clioUrl = '') {
   const intro = reason === 'folder_not_found'
     ? `Uw e-mail met projectnummer ${projectNumber} kon niet automatisch in SharePoint worden geplaatst, omdat er geen bijbehorende projectmap is gevonden.`
     : `Uw e-mail met projectnummer ${projectNumber} kon niet automatisch in SharePoint worden geplaatst.`;
@@ -120,14 +176,16 @@ export function buildProjectUploadFailedNotification(projectNumber, reason = 'fo
       intro,
       'De e-mail is wel gearchiveerd in Clio.',
     ],
+    clioUrl,
   });
 }
 
-export function buildProjectUploadSuccessNotification(projectNumber, description, fileUrl = '') {
+export function buildProjectUploadSuccessNotification(projectNumber, description, sharePointUrl = '', clioUrl = '') {
   return buildClioNotificationEmail({
     paragraphs: [
       `Uw e-mail is geplaatst in SharePoint onder projectnummer ${projectNumber} (${description}) en gearchiveerd in Clio.`,
     ],
-    fileUrl: String(fileUrl ?? '').trim(),
+    clioUrl,
+    sharePointUrl: String(sharePointUrl ?? '').trim(),
   });
 }
