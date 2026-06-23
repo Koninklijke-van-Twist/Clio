@@ -8,11 +8,15 @@ import {
   getMessageSender,
 } from './mail-notify.js';
 import {
+  buildDriveChildrenUrl,
+  buildDriveUploadUrl,
   encodeSharePointPath,
   extractProjectNumber,
   findProjectFolder,
+  getProjectsFolderPath,
   handleProjectSharePointUpload,
   parseProjectFolderName,
+  resolveSharePointDriveId,
   uploadEmlToProjectFolder,
 } from './project.js';
 
@@ -36,6 +40,46 @@ test('parseProjectFolderName extracts description from folder name', () => {
 
 test('encodeSharePointPath encodes each segment', () => {
   assert.equal(encodeSharePointPath('Projects', 'PRJ123456_Demo', '0001-test.eml'), 'Projects/PRJ123456_Demo/0001-test.eml');
+});
+
+test('getProjectsFolderPath uses drive root when driveId is configured', () => {
+  assert.equal(getProjectsFolderPath({ driveId: 'drive-1' }), '');
+  assert.equal(getProjectsFolderPath({ driveId: 'drive-1', projectsFolder: '' }), '');
+  assert.equal(getProjectsFolderPath({ driveId: 'drive-1', projectsFolder: 'Projects' }), 'Projects');
+  assert.equal(getProjectsFolderPath({}), 'Projects');
+});
+
+test('buildDriveChildrenUrl targets drive root when projectsFolder is empty', () => {
+  assert.equal(
+    buildDriveChildrenUrl('https://graph.test/v1.0', 'drive-1', ''),
+    'https://graph.test/v1.0/drives/drive-1/root/children?$select=name,folder',
+  );
+  assert.equal(
+    buildDriveChildrenUrl('https://graph.test/v1.0', 'drive-1', 'Projects'),
+    'https://graph.test/v1.0/drives/drive-1/root:/Projects:/children?$select=name,folder',
+  );
+});
+
+test('findProjectFolder can list project folders from Projects library root', async () => {
+  const folder = await findProjectFolder({
+    driveId: 'drive-projects',
+    projectsFolder: '',
+    graphBaseUrl: 'https://graph.test/v1.0',
+  }, 'token-1', '153703', async (url) => {
+    assert.equal(
+      url,
+      'https://graph.test/v1.0/drives/drive-projects/root/children?$select=name,folder',
+    );
+
+    return Response.json({
+      value: [{ name: '153703_Demo Project', folder: {} }],
+    });
+  });
+
+  assert.deepEqual(folder, {
+    folderName: '153703_Demo Project',
+    description: 'Demo Project',
+  });
 });
 
 test('findProjectFolder returns first matching project folder', async () => {
@@ -148,11 +192,35 @@ test('getMessageSender reads Graph from address', () => {
   });
 });
 
+test('resolveSharePointDriveId prefers explicit driveId', async () => {
+  const driveId = await resolveSharePointDriveId({
+    driveId: 'drive-explicit',
+    siteHostname: 'example.test',
+    sitePath: '/sites/Demo',
+  }, 'token-1', async () => {
+    throw new Error('fetch should not be called when driveId is set');
+  });
+
+  assert.equal(driveId, 'drive-explicit');
+});
+
+test('resolveSharePointDriveId can resolve drive via siteId', async () => {
+  const driveId = await resolveSharePointDriveId({
+    siteId: 'kvtnl.sharepoint.com,site-guid-here',
+    graphBaseUrl: 'https://graph.test/v1.0',
+  }, 'token-1', async (url) => {
+    assert.equal(url, 'https://graph.test/v1.0/sites/kvtnl.sharepoint.com%2Csite-guid-here/drive');
+    return Response.json({ id: 'drive-from-site-id' });
+  });
+
+  assert.equal(driveId, 'drive-from-site-id');
+});
+
 test('uploadEmlToProjectFolder puts file in project folder', async () => {
   let uploadUrl = '';
   await uploadEmlToProjectFolder({
     driveId: 'drive-1',
-    projectsFolder: 'Projects',
+    projectsFolder: '',
     graphBaseUrl: 'https://graph.test/v1.0',
   }, 'token-1', {
     folderName: '151234_Legacy',
@@ -165,6 +233,13 @@ test('uploadEmlToProjectFolder puts file in project folder', async () => {
 
   assert.equal(
     uploadUrl,
-    'https://graph.test/v1.0/drives/drive-1/root:/Projects/151234_Legacy/0001-mail.eml:/content',
+    'https://graph.test/v1.0/drives/drive-1/root:/151234_Legacy/0001-mail.eml:/content',
+  );
+});
+
+test('buildDriveUploadUrl supports nested projects folder', () => {
+  assert.equal(
+    buildDriveUploadUrl('https://graph.test/v1.0', 'drive-1', 'Projects', 'PRJ123456_Demo', 'mail.eml'),
+    'https://graph.test/v1.0/drives/drive-1/root:/Projects/PRJ123456_Demo/mail.eml:/content',
   );
 });

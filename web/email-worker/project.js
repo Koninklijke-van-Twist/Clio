@@ -25,18 +25,20 @@ export function extractProjectNumber(subject) {
 }
 
 export function parseProjectFolderName(folderName, projectNumber) {
-  const prefix = `${projectNumber}_`;
-  if (!String(folderName).startsWith(prefix)) {
+  const folder = String(folderName);
+  const normalizedFolder = folder.toLowerCase();
+  const normalizedPrefix = `${String(projectNumber).toLowerCase()}_`;
+  if (!normalizedFolder.startsWith(normalizedPrefix)) {
     return null;
   }
 
-  const description = String(folderName).slice(prefix.length).trim();
+  const description = folder.slice(String(projectNumber).length + 1).trim();
   if (description === '') {
     return null;
   }
 
   return {
-    folderName: String(folderName),
+    folderName: folder,
     description,
   };
 }
@@ -49,19 +51,52 @@ export function encodeSharePointPath(...segments) {
     .join('/');
 }
 
+export function getProjectsFolderPath(sharepointConfig) {
+  if (Object.prototype.hasOwnProperty.call(sharepointConfig ?? {}, 'projectsFolder')) {
+    return String(sharepointConfig.projectsFolder ?? '').trim();
+  }
+
+  return String(sharepointConfig?.driveId ?? '').trim() !== '' ? '' : 'Projects';
+}
+
+export function buildDriveChildrenUrl(graphBaseUrl, driveId, projectsFolder) {
+  const base = `${graphBaseUrl}/drives/${encodeURIComponent(driveId)}`;
+  const folderPath = encodeSharePointPath(projectsFolder);
+  if (folderPath === '') {
+    return `${base}/root/children?$select=name,folder`;
+  }
+
+  return `${base}/root:/${folderPath}:/children?$select=name,folder`;
+}
+
+export function buildDriveUploadUrl(graphBaseUrl, driveId, ...pathSegments) {
+  const uploadPath = encodeSharePointPath(...pathSegments);
+  return `${graphBaseUrl}/drives/${encodeURIComponent(driveId)}/root:/${uploadPath}:/content`;
+}
+
 export async function resolveSharePointDriveId(sharepointConfig, accessToken, fetchImpl = fetch) {
   if (String(sharepointConfig?.driveId ?? '').trim() !== '') {
     return String(sharepointConfig.driveId).trim();
   }
 
+  const graphBaseUrl = String(sharepointConfig.graphBaseUrl ?? DEFAULT_GRAPH_BASE_URL).replace(/\/+$/, '');
+  const siteId = String(sharepointConfig?.siteId ?? '').trim();
+  if (siteId !== '') {
+    const url = `${graphBaseUrl}/sites/${encodeURIComponent(siteId)}/drive`;
+    return fetchSharePointDriveId(url, accessToken, fetchImpl);
+  }
+
   const hostname = String(sharepointConfig?.siteHostname ?? '').trim();
   const sitePath = String(sharepointConfig?.sitePath ?? '').trim();
   if (hostname === '' || sitePath === '') {
-    throw new Error('SharePoint configuratie mist siteHostname/sitePath of driveId.');
+    throw new Error('SharePoint configuratie mist driveId, siteId of siteHostname/sitePath.');
   }
 
-  const graphBaseUrl = String(sharepointConfig.graphBaseUrl ?? DEFAULT_GRAPH_BASE_URL).replace(/\/+$/, '');
   const url = `${graphBaseUrl}/sites/${encodeURIComponent(hostname)}:${sitePath}:/drive`;
+  return fetchSharePointDriveId(url, accessToken, fetchImpl);
+}
+
+async function fetchSharePointDriveId(url, accessToken, fetchImpl) {
   const response = await fetchImpl(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -79,10 +114,9 @@ export async function resolveSharePointDriveId(sharepointConfig, accessToken, fe
 
 export async function findProjectFolder(sharepointConfig, accessToken, projectNumber, fetchImpl = fetch) {
   const driveId = await resolveSharePointDriveId(sharepointConfig, accessToken, fetchImpl);
-  const projectsFolder = String(sharepointConfig?.projectsFolder ?? 'Projects').trim() || 'Projects';
+  const projectsFolder = getProjectsFolderPath(sharepointConfig);
   const graphBaseUrl = String(sharepointConfig.graphBaseUrl ?? DEFAULT_GRAPH_BASE_URL).replace(/\/+$/, '');
-  const folderPath = encodeSharePointPath(projectsFolder);
-  const url = `${graphBaseUrl}/drives/${encodeURIComponent(driveId)}/root:/${folderPath}:/children?$select=name,folder`;
+  const url = buildDriveChildrenUrl(graphBaseUrl, driveId, projectsFolder);
   const response = await fetchImpl(url, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -111,10 +145,15 @@ export async function findProjectFolder(sharepointConfig, accessToken, projectNu
 
 export async function uploadEmlToProjectFolder(sharepointConfig, accessToken, projectFolder, emlFileName, emlContent, fetchImpl = fetch) {
   const driveId = await resolveSharePointDriveId(sharepointConfig, accessToken, fetchImpl);
-  const projectsFolder = String(sharepointConfig?.projectsFolder ?? 'Projects').trim() || 'Projects';
+  const projectsFolder = getProjectsFolderPath(sharepointConfig);
   const graphBaseUrl = String(sharepointConfig.graphBaseUrl ?? DEFAULT_GRAPH_BASE_URL).replace(/\/+$/, '');
-  const uploadPath = encodeSharePointPath(projectsFolder, projectFolder.folderName, emlFileName);
-  const url = `${graphBaseUrl}/drives/${encodeURIComponent(driveId)}/root:/${uploadPath}:/content`;
+  const url = buildDriveUploadUrl(
+    graphBaseUrl,
+    driveId,
+    projectsFolder,
+    projectFolder.folderName,
+    emlFileName,
+  );
   const response = await fetchImpl(url, {
     method: 'PUT',
     headers: {
@@ -129,7 +168,7 @@ export async function uploadEmlToProjectFolder(sharepointConfig, accessToken, pr
     throw new Error(`SharePoint upload failed (${response.status}): ${errorText}`);
   }
 
-  return uploadPath;
+  return encodeSharePointPath(projectsFolder, projectFolder.folderName, emlFileName);
 }
 
 export async function handleProjectSharePointUpload(config, accessToken, subject, emlFileName, emlContent, fetchImpl = fetch) {

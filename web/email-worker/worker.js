@@ -112,11 +112,18 @@ export async function processMailbox(config, options = {}) {
     console.log(`Archived Graph message ${message.id} in ${result.folderName}/${result.emlFile}`);
 
     let projectResult = { handled: false };
+    const subjectForProject = String(message.subject ?? result.subject ?? '');
+    const detectedProjectNumber = extractProjectNumber(subjectForProject);
+
+    if (detectedProjectNumber !== null) {
+      console.log(`Detected project number ${detectedProjectNumber} in subject "${subjectForProject}"`);
+    }
+
     try {
       projectResult = await handleProjectSharePointUpload(
         config,
         token,
-        message.subject ?? result.subject,
+        subjectForProject,
         result.emlFile,
         rawEmail,
         fetchImpl,
@@ -126,15 +133,18 @@ export async function processMailbox(config, options = {}) {
         if (projectResult.uploaded === true) {
           console.log(`Uploaded ${result.emlFile} to SharePoint project ${projectResult.projectNumber} (${projectResult.projectFolder.description})`);
         } else {
-          console.log(`SharePoint upload skipped for project ${projectResult.projectNumber}: ${projectResult.reason ?? 'unknown'}`);
+          const details = projectResult.error ? ` (${projectResult.error})` : '';
+          console.log(`SharePoint upload skipped for project ${projectResult.projectNumber}: ${projectResult.reason ?? 'unknown'}${details}`);
         }
+      } else if (detectedProjectNumber === null && (config.sharepoint?.enabled !== false)) {
+        console.log(`No project number found in subject "${subjectForProject}"; SharePoint upload skipped`);
       }
     } catch (error) {
       console.error(`SharePoint handling failed for message ${message.id}:`, error);
-      if (extractProjectNumber(message.subject ?? result.subject) !== null) {
+      if (extractProjectNumber(subjectForProject) !== null) {
         projectResult = {
           handled: true,
-          projectNumber: extractProjectNumber(message.subject ?? result.subject),
+          projectNumber: extractProjectNumber(subjectForProject),
           uploaded: false,
           reason: 'sharepoint_error',
         };

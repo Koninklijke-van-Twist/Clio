@@ -3,10 +3,11 @@
   "archiveRoot": "../data/emails",
   "sharepoint": {
     "enabled": true,
+    "driveId": "b!...",
+    "projectsFolder": "",
+    "siteId": "",
     "siteHostname": "kvtnl.sharepoint.com",
-    "sitePath": "/sites/BCDocumentRepository",
-    "projectsFolder": "Projects",
-    "driveId": ""
+    "sitePath": "/sites/BCDocumentRepository"
   },
   "graph": {
     "tenantId": "00000000-0000-0000-0000-000000000000",

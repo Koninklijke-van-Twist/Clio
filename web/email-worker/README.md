@@ -60,6 +60,22 @@ Als het onderwerp `PRJ` gevolgd door 6-9 cijfers of een 6-cijferig nummer dat be
 
 De worker zoekt een bestaande map die begint met `<nr>_`. Bestaat die map niet, dan krijgt alleen de afzender een melding dat SharePoint-upload niet lukte maar Clio-archivering wel. Bij succes krijgt alleen de afzender een bevestiging met projectnummer en mapnaam.
 
+### SharePoint configuratie
+
+De transcript-upload in `auth.php` gebruikt een **andere** SharePoint-site (`site_id` / `drive_id` voor meetingtranscripten). Voor projectmails heb je de site en drive nodig van **BCDocumentRepository**, niet de IDs uit `auth.php` kopiëren.
+
+Voorkeur in `config.json`:
+
+1. `driveId` — ID van de **Projects**-documentbibliotheek op BCDocumentRepository
+2. `projectsFolder` — leeg (`""`) als `driveId` al naar die bibliotheek wijst; projectmappen staan dan direct in de root (`153703_Omschrijving`)
+3. optioneel `siteId` of `siteHostname` + `sitePath` — alleen nodig als je geen `driveId` gebruikt
+
+Zoek de juiste `driveId` via Graph (met dezelfde app-registratie):
+
+`GET https://graph.microsoft.com/v1.0/sites/kvtnl.sharepoint.com:/sites/BCDocumentRepository:/drives`
+
+Kies de drive waar de map `Projects` onder staat en zet die ID in `sharepoint.driveId` op de server.
+
 Voor overige e-mails stuurt de worker alleen naar de afzender een bevestiging dat de mail in Clio gearchiveerd is. CC en andere ontvangers krijgen geen automatische reactie.
 
 Installeer of update de systemd service op de server met:
