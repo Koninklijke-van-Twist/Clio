@@ -1,3 +1,10 @@
+import {
+  buildArchiveOnlyNotification,
+  buildClioNotificationEmail,
+  buildProjectUploadFailedNotification,
+  buildProjectUploadSuccessNotification,
+} from './mail-template.js';
+
 /**
  * Consts
  */
@@ -56,6 +63,9 @@ export function buildIctDiagnosticLines({ graphMessage, archiveResult, projectRe
     if (projectResult.uploadPath) {
       lines.push(`SharePoint pad: ${projectResult.uploadPath}`);
     }
+    if (projectResult.fileUrl) {
+      lines.push(`SharePoint URL: ${projectResult.fileUrl}`);
+    }
     if (projectResult.metadataUpdated !== undefined) {
       lines.push(`Metadata bijgewerkt: ${projectResult.metadataUpdated ? 'ja' : 'nee'}`);
     }
@@ -104,38 +114,49 @@ export function buildReplySubject(originalSubject) {
 }
 
 export function buildArchiveOnlyBody() {
-  return [
-    'Uw e-mail is succesvol gearchiveerd in Clio.',
-    '',
-    'Met vriendelijke groet,',
-    'Clio',
-  ].join('\n');
+  return buildArchiveOnlyNotification().plainText;
 }
 
 export function buildProjectUploadFailedBody(projectNumber, reason = 'folder_not_found') {
-  const intro = reason === 'folder_not_found'
-    ? `Uw e-mail met projectnummer ${projectNumber} kon niet automatisch in SharePoint worden geplaatst, omdat er geen bijbehorende projectmap is gevonden.`
-    : `Uw e-mail met projectnummer ${projectNumber} kon niet automatisch in SharePoint worden geplaatst.`;
-
-  return [
-    intro,
-    'De e-mail is wel gearchiveerd in Clio.',
-    '',
-    'Met vriendelijke groet,',
-    'Clio',
-  ].join('\n');
+  return buildProjectUploadFailedNotification(projectNumber, reason).plainText;
 }
 
-export function buildProjectUploadSuccessBody(projectNumber, description) {
-  return [
-    `Uw e-mail is geplaatst in SharePoint onder projectnummer ${projectNumber} (${description}) en gearchiveerd in Clio.`,
-    '',
-    'Met vriendelijke groet,',
-    'Clio',
-  ].join('\n');
+export function buildProjectUploadSuccessBody(projectNumber, description, fileUrl = '') {
+  return buildProjectUploadSuccessNotification(projectNumber, description, fileUrl).plainText;
 }
 
-export async function sendMailToSender(graphConfig, accessToken, { toEmail, toName, subject, body }, fetchImpl = fetch) {
+export function buildNotificationMessage(projectResult, options = {}) {
+  const diagnosticLines = Array.isArray(options.diagnosticLines) ? options.diagnosticLines : [];
+  let paragraphs = [];
+  let fileUrl = '';
+
+  if (projectResult?.handled === true) {
+    if (projectResult.uploaded === true && projectResult.projectFolder) {
+      paragraphs = [
+        `Uw e-mail is geplaatst in SharePoint onder projectnummer ${projectResult.projectNumber} (${projectResult.projectFolder.description}) en gearchiveerd in Clio.`,
+      ];
+      fileUrl = String(projectResult.fileUrl ?? '').trim();
+    } else {
+      const intro = projectResult.reason === 'folder_not_found'
+        ? `Uw e-mail met projectnummer ${projectResult.projectNumber} kon niet automatisch in SharePoint worden geplaatst, omdat er geen bijbehorende projectmap is gevonden.`
+        : `Uw e-mail met projectnummer ${projectResult.projectNumber} kon niet automatisch in SharePoint worden geplaatst.`;
+      paragraphs = [
+        intro,
+        'De e-mail is wel gearchiveerd in Clio.',
+      ];
+    }
+  } else {
+    paragraphs = ['Uw e-mail is succesvol gearchiveerd in Clio.'];
+  }
+
+  return buildClioNotificationEmail({
+    paragraphs,
+    fileUrl,
+    diagnosticLines,
+  });
+}
+
+export async function sendMailToSender(graphConfig, accessToken, { toEmail, toName, subject, body, htmlBody }, fetchImpl = fetch) {
   const email = String(toEmail ?? '').trim();
   if (email === '') {
     throw new Error('Afzenderadres ontbreekt; notificatie niet verstuurd.');
@@ -144,6 +165,7 @@ export async function sendMailToSender(graphConfig, accessToken, { toEmail, toNa
   const graphBaseUrl = String(graphConfig.graphBaseUrl ?? DEFAULT_GRAPH_BASE_URL).replace(/\/+$/, '');
   const mailbox = encodeURIComponent(graphConfig.mailbox);
   const url = `${graphBaseUrl}/users/${mailbox}/sendMail`;
+  const html = String(htmlBody ?? '').trim();
   const response = await fetchImpl(url, {
     method: 'POST',
     headers: {
@@ -154,10 +176,15 @@ export async function sendMailToSender(graphConfig, accessToken, { toEmail, toNa
     body: JSON.stringify({
       message: {
         subject,
-        body: {
-          contentType: 'Text',
-          content: body,
-        },
+        body: html !== ''
+          ? {
+            contentType: 'HTML',
+            content: html,
+          }
+          : {
+            contentType: 'Text',
+            content: body,
+          },
         toRecipients: [
           {
             emailAddress: {
@@ -192,38 +219,22 @@ export async function sendArchiveNotifications(workerConfig, accessToken, graphM
   const ictUsers = workerConfig.ictUsers ?? [];
   const includeIctDiagnostics = isIctUser(sender.email, ictUsers);
   const replySubject = buildReplySubject(graphMessage?.subject ?? archiveResult?.subject ?? '');
-  let body = '';
-
-  if (projectResult?.handled === true) {
-    if (projectResult.uploaded === true && projectResult.projectFolder) {
-      body = buildProjectUploadSuccessBody(
-        projectResult.projectNumber,
-        projectResult.projectFolder.description,
-      );
-    } else {
-      body = buildProjectUploadFailedBody(
-        projectResult.projectNumber,
-        projectResult.reason,
-      );
-    }
-  } else {
-    body = buildArchiveOnlyBody();
-  }
-
-  if (includeIctDiagnostics) {
-    body = appendIctDiagnostics(body, buildIctDiagnosticLines({
+  const diagnosticLines = includeIctDiagnostics
+    ? buildIctDiagnosticLines({
       graphMessage,
       archiveResult,
       projectResult,
       processingErrors: options.processingErrors ?? [],
-    }));
-  }
+    })
+    : [];
+  const notification = buildNotificationMessage(projectResult, { diagnosticLines });
 
   await sendMailToSender(graphConfig, accessToken, {
     toEmail: sender.email,
     toName: sender.name,
     subject: replySubject,
-    body,
+    body: notification.plainText,
+    htmlBody: notification.html,
   }, fetchImpl);
 
   return {

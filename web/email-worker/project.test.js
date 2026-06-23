@@ -171,7 +171,10 @@ test('handleProjectSharePointUpload uploads only eml when project folder exists'
     }
 
     if (String(url).includes('/root:/Projects/PRJ123456_Demo/016_CORRESPONDENCE/0001-test.eml:/content') && options.method === 'PUT') {
-      return Response.json({ id: 'item-1' }, { status: 201 });
+      return Response.json({
+        id: 'item-1',
+        webUrl: 'https://kvtnl.sharepoint.com/sites/Demo/Projects/PRJ123456_Demo/016_CORRESPONDENCE/0001-test.eml',
+      }, { status: 201 });
     }
 
     if (String(url).includes('/list/columns?')) {
@@ -199,6 +202,7 @@ test('handleProjectSharePointUpload uploads only eml when project folder exists'
       description: 'Demo',
     },
     uploadPath: 'Projects/PRJ123456_Demo/016_CORRESPONDENCE/0001-test.eml',
+    fileUrl: 'https://kvtnl.sharepoint.com/sites/Demo/Projects/PRJ123456_Demo/016_CORRESPONDENCE/0001-test.eml',
     metadataUpdated: true,
     metadataError: '',
   });
@@ -233,6 +237,10 @@ test('notification bodies cover archive and project outcomes', () => {
   assert.match(buildArchiveOnlyBody(), /gearchiveerd in Clio/);
   assert.match(buildProjectUploadFailedBody('PRJ123456'), /PRJ123456/);
   assert.match(buildProjectUploadSuccessBody('PRJ123456', 'Demo'), /PRJ123456 \(Demo\)/);
+  assert.match(
+    buildProjectUploadSuccessBody('PRJ123456', 'Demo', 'https://example.test/file.eml'),
+    /https:\/\/example\.test\/file\.eml/,
+  );
   assert.equal(buildReplySubject('Offerte'), 'Re: Offerte');
   assert.equal(buildReplySubject('Re: Offerte'), 'Re: Offerte');
 });

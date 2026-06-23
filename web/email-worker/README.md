@@ -76,7 +76,7 @@ Zoek de juiste `driveId` via Graph (met dezelfde app-registratie):
 
 Kies de drive waar de map `Projects` onder staat en zet die ID in `sharepoint.driveId` op de server.
 
-Voor overige e-mails stuurt de worker alleen naar de afzender een bevestiging dat de mail in Clio gearchiveerd is. CC en andere ontvangers krijgen geen automatische reactie.
+Voor overige e-mails stuurt de worker alleen naar de afzender een bevestiging dat de mail in Clio gearchiveerd is. CC en andere ontvangers krijgen geen automatische reactie. Bevestigingsmails worden als HTML verstuurd in de Clio-huisstijl (inline CSS). Bij een geslaagde SharePoint-upload bevat de mail een knop en link naar het geüploade `.eml`-bestand (`webUrl` uit de Graph-uploadresponse).
 
 Afzenders uit `$ictUsers` in `auth.php` krijgen in de bevestigingsmail een extra ICT-diagnoseblok met volledige SharePoint-foutcodes en verwerkingsdetails. De email-worker leest die lijst via `ict-users.php` en `load-auth.php` (productie: `auth.php`; tests/CI: `mock-auth.php` met `CLIO_USE_MOCK_AUTH=1`).
 

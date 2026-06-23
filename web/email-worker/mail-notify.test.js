@@ -37,6 +37,7 @@ test('buildIctDiagnosticLines includes sharepoint and processing errors', () => 
 
 test('sendArchiveNotifications appends ICT diagnostics for configured users', async () => {
   let sentBody = '';
+  let contentType = '';
   const result = await sendArchiveNotifications({
     ictUsers: ['tfalken@kvt.nl'],
     graph: {
@@ -56,18 +57,22 @@ test('sendArchiveNotifications appends ICT diagnostics for configured users', as
     uploaded: false,
     reason: 'folder_not_found',
   }, {}, async (_url, options) => {
-    sentBody = JSON.parse(options.body).message.body.content;
+    const payload = JSON.parse(options.body).message.body;
+    sentBody = payload.content;
+    contentType = payload.contentType;
     return new Response(null, { status: 202 });
   });
 
   assert.equal(result.ictDiagnostics, true);
-  assert.match(sentBody, /--- ICT diagnose ---/);
+  assert.equal(contentType, 'HTML');
+  assert.match(sentBody, /ICT diagnose/);
   assert.match(sentBody, /SharePoint reden: folder_not_found/);
   assert.doesNotMatch(sentBody, /Technische details:/);
 });
 
 test('sendArchiveNotifications keeps normal body for non-ICT users', async () => {
   let sentBody = '';
+  let contentType = '';
   await sendArchiveNotifications({
     ictUsers: ['tfalken@kvt.nl'],
     graph: {
@@ -87,11 +92,14 @@ test('sendArchiveNotifications keeps normal body for non-ICT users', async () =>
     reason: 'upload_failed',
     error: 'SharePoint upload failed (403): accessDenied',
   }, {}, async (_url, options) => {
-    sentBody = JSON.parse(options.body).message.body.content;
+    const payload = JSON.parse(options.body).message.body;
+    sentBody = payload.content;
+    contentType = payload.contentType;
     return new Response(null, { status: 202 });
   });
 
-  assert.doesNotMatch(sentBody, /--- ICT diagnose ---/);
+  assert.equal(contentType, 'HTML');
+  assert.doesNotMatch(sentBody, /ICT diagnose/);
   assert.doesNotMatch(sentBody, /403/);
 });
 

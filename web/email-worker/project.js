@@ -259,6 +259,7 @@ export async function uploadEmlToProjectFolder(sharepointConfig, accessToken, pr
 
   return {
     uploadPath: encodeSharePointPath(...uploadPathSegments),
+    fileUrl: String(uploadJson?.webUrl ?? '').trim(),
     metadataUpdated: metadataResult.updated,
     metadataError: metadataResult.error ?? '',
   };
@@ -355,6 +356,7 @@ export async function handleProjectSharePointUpload(config, accessToken, subject
       uploaded: true,
       projectFolder,
       uploadPath: uploadResult.uploadPath,
+      fileUrl: uploadResult.fileUrl,
       metadataUpdated: uploadResult.metadataUpdated,
       metadataError: uploadResult.metadataError,
     };
