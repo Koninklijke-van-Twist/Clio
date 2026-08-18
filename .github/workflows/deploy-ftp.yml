@@ -94,6 +94,8 @@ jobs:
             --exclude-glob data/** \
             --exclude-glob email-worker/config.json \
             --exclude-glob email-worker/node_modules/** \
+            --exclude-glob analytics/*.sqlite \
+            --exclude-glob analytics/*.sqlite-* \
             --exclude-glob auth.php \
             ./web .
 

@@ -13,3 +13,6 @@ vapid-keys/
 vendor/
 node_modules/
 .phpunit.cache/
+
+web/analytics/analytics.sqlite
+web/analytics/analytics.sqlite-*
