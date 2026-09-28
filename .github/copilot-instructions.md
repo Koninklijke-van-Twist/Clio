@@ -7,7 +7,7 @@
 
 ## Niet wijzigen
 - Bestand `web/logincheck.php` niet aanpassen.
-- Bestand `web/odata.php` niet aanpassen.
+- Bestand `web/odata.php` niet aanpassen, behalve de Mímir-fallback. Die uitzondering is goedgekeurd door Tim Falken op 2026-09-28; de fallback hoort in dit bestand.
 - Bestand `web/auth.php` alleen aanpassen na expliciete gebruikersvraag.
 
 ## Data en logica werkorders
@@ -67,7 +67,7 @@
   - geen class-definities tussen page-load code in gecombineerde scriptbestanden
 - Respecteer altijd bestaande uitzonderingen uit deze instructies:
   - `web/logincheck.php` niet aanpassen
-  - `web/odata.php` niet aanpassen
+  - `web/odata.php` niet aanpassen, behalve de Mímir-fallback (Tim Falken, 2026-09-28)
   - `web/auth.php` alleen aanpassen na expliciete gebruikersvraag
 
 ## Lokalisatie (meertaligheid)

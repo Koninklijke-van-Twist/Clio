@@ -205,6 +205,56 @@ if ($spaced !== "https://bc.example:7148/My%20Env/ODataV4/Company('X')/Projecten
     fail('environment-segment werd dubbel geëncodeerd: ' . $spaced);
 }
 
+$savedFetch = $GLOBALS['CLIO_ODATA_BC_FETCH'];
+$partialUrls = [];
+$GLOBALS['CLIO_ODATA_BC_FETCH'] = static function (string $url, array $fetchAuth, int $ttl) use (&$partialUrls): array {
+    $partialUrls[] = $url;
+    if (strpos($url, '/Production/') !== false) {
+        throw new Exception('Production down');
+    }
+    return [['Name' => 'Sandbox Only BV']];
+};
+odata_mimir_circuit_reset();
+$partialNames = odata_mimir_list_companies(null);
+$GLOBALS['CLIO_ODATA_BC_FETCH'] = $savedFetch;
+if ($partialNames !== ['Sandbox Only BV']) {
+    fail('een falend environment mag gezonde bedrijven niet verbergen: ' . json_encode($partialNames));
+}
+$sawProduction = false;
+$sawSandbox = false;
+foreach ($partialUrls as $partialUrl) {
+    if (strpos($partialUrl, '/Production/ODataV4/Company') !== false) {
+        $sawProduction = true;
+    }
+    if (strpos($partialUrl, '/Sandbox/ODataV4/Company') !== false) {
+        $sawSandbox = true;
+    }
+}
+if (!$sawProduction || !$sawSandbox) {
+    fail('company-lijst stopte na het eerste environment: ' . json_encode($partialUrls));
+}
+
+$failedUrls = [];
+$GLOBALS['CLIO_ODATA_BC_FETCH'] = static function (string $url, array $fetchAuth, int $ttl) use (&$failedUrls): array {
+    $failedUrls[] = $url;
+    throw new Exception('all environments down');
+};
+odata_mimir_circuit_reset();
+$allFailed = null;
+try {
+    odata_mimir_list_companies(null);
+} catch (Throwable $exception) {
+    $allFailed = $exception;
+}
+$GLOBALS['CLIO_ODATA_BC_FETCH'] = $savedFetch;
+if (!$allFailed instanceof Throwable || strpos($allFailed->getMessage(), 'all environments down') === false) {
+    $allFailedMessage = $allFailed instanceof Throwable ? $allFailed->getMessage() : 'geen exception';
+    fail('als elk environment faalt moet die fout terugkomen: ' . $allFailedMessage);
+}
+if (count($failedUrls) < 2) {
+    fail('elk environment moet geprobeerd worden: ' . json_encode($failedUrls));
+}
+
 odata_mimir_circuit_reset();
 $loggedBeforeCaller = fallback_count();
 $callerError = null;

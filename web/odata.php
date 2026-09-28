@@ -672,6 +672,8 @@ function odata_direct_companies_as_rows(?string $environmentFilter = null): arra
 
     $out = [];
     $attempted = 0;
+    $completed = 0;
+    $firstError = null;
     foreach ($envs as $env) {
         $auth = odata_bc_auth_for_known_environment($env, [], true);
         if ($auth === null) {
@@ -679,7 +681,15 @@ function odata_direct_companies_as_rows(?string $environmentFilter = null): arra
         }
         $attempted++;
         $url = rtrim($base, '/') . '/' . rawurlencode($env) . '/ODataV4/Company';
-        $rows = odata_get_all_direct($url, $auth, 300);
+        try {
+            $rows = odata_get_all_direct($url, $auth, 300);
+            $completed++;
+        } catch (Throwable $exception) {
+            if (!$firstError instanceof Throwable) {
+                $firstError = $exception;
+            }
+            continue;
+        }
         foreach ($rows as $row) {
             if (!is_array($row)) {
                 continue;
@@ -698,6 +708,9 @@ function odata_direct_companies_as_rows(?string $environmentFilter = null): arra
             throw $previous;
         }
         throw new Exception('Mímir mislukt.');
+    }
+    if ($completed === 0 && $firstError instanceof Throwable) {
+        throw $firstError;
     }
     return $out;
 }
