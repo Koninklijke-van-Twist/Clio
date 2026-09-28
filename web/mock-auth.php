@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+// Productie-auth.php mag $mimirApi zetten, maar $auth_list / $environment / $auth / $baseUrl
+// moeten daarnaast blijven staan: dat is de directe BC-fallback als Mímir uitvalt.
+// $mimirApi  = 'mimir_…';
+// $mimirBase = 'https://sleutels.kvt.nl/mimir/api';
+
 $auth_list = [
     'test_aad' => ['mode' => 'basic', 'user' => 'test-user', 'pass' => 'test-pass'],
 ];
