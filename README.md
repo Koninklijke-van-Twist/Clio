@@ -22,3 +22,5 @@ Met `$mimirApi` proberen OData-fetches en company-discovery (`odata_get_all`, `o
 Dit geldt voor live webrequests én voor CLI/cron. `web/content/bootstrap.php` laadt `auth.php` bij een webrequest. Een CLI-script dat alleen `$mimirApi` zet, laadt `auth.php` alsnog zodra de fallback de BC-credentials nodig heeft. Webrequests gebruiken een Mímir-timeout van ongeveer 90 seconden (connect-timeout 10 seconden); `PHP_SAPI=cli` houdt de lange timeout van 600 seconden.
 
 De email-worker (Node) leest geen Business Central OData; die gebruikt Microsoft Graph. Zonder `$mimirApi` blijft alleen de directe BC-route actief.
+
+De fallback staat in `web/odata.php`. Dat bestand verder niet wijzigen; deze fallback is een goedgekeurde uitzondering (Tim Falken, 2026-09-28).
