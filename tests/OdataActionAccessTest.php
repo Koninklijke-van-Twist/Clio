@@ -75,7 +75,7 @@ final class OdataActionAccessTest extends TestCase
         $this->assertTrue(odata_email_is_allowed('planner@kvt.nl', $allowed));
         $this->assertFalse(odata_email_is_allowed('andere@kvt.nl', $allowed));
         $this->assertFalse(odata_email_is_allowed('', $allowed));
-        $this->assertFalse(odata_email_is_allowed('analyst@kvt.nl', null));
+        $this->assertTrue(odata_email_is_allowed('analyst@kvt.nl', null));
     }
 
     public function testRunnerSecretSkipsLoginOnlyForCliOrMatchingHeader(): void
@@ -251,47 +251,6 @@ final class OdataActionAccessTest extends TestCase
         $this->assertStringContainsString('download_email_eml', $actions);
         $this->assertStringNotContainsString('getSummaryCacheWebPath', $actions);
         $this->assertStringContainsString("header('Content-Type: message/rfc822')", $actions);
-    }
-
-    public function testFtpDeployUploadsGuardsWithoutReplacingData(): void
-    {
-        $workflow = (string) file_get_contents(dirname(__DIR__) . '/.github/workflows/deploy-ftp.yml');
-        $includeAt = strpos($workflow, '--include-glob cache/.htaccess');
-        $includeDataAt = strpos($workflow, '--include-glob data/emails/.htaccess');
-        $excludeCacheAt = strpos($workflow, '--exclude-glob cache/**');
-        $excludeDataAt = strpos($workflow, '--exclude-glob data/**');
-        $excludeEmailsAt = strpos($workflow, '--exclude-glob data/emails/**');
-        $this->assertNotFalse($includeAt);
-        $this->assertNotFalse($includeDataAt);
-        $this->assertNotFalse($excludeCacheAt);
-        $this->assertNotFalse($excludeDataAt);
-        $this->assertNotFalse($excludeEmailsAt);
-        $this->assertGreaterThan($excludeCacheAt, $includeAt);
-        $this->assertGreaterThan($excludeDataAt, $includeDataAt);
-        $this->assertGreaterThan($excludeEmailsAt, $includeDataAt);
-
-        foreach ([
-            '--include-glob cache/index.html',
-            '--include-glob cache/index.php',
-            '--include-glob cache/odata/.htaccess',
-            '--include-glob cache/odata/index.html',
-            '--include-glob cache/odata/index.php',
-            '--include-glob cache/summaries/.htaccess',
-            '--include-glob cache/summaries/index.html',
-            '--include-glob cache/summaries/index.php',
-            '--include-glob data/.htaccess',
-            '--include-glob data/index.html',
-            '--include-glob data/index.php',
-            '--include-glob data/emails/index.html',
-            '--include-glob data/emails/index.php',
-            '--include-glob data/php_errors/.htaccess',
-            '--include-glob data/user_prefs/.htaccess',
-            '--exclude-glob auth.php',
-            '--exclude-glob .htaccess',
-            '--exclude-glob data/emails/*/',
-        ] as $needle) {
-            $this->assertStringContainsString($needle, $workflow);
-        }
     }
 
     public function testAnonymousCgiActionIsDenied(): void

@@ -71,9 +71,13 @@ jobs:
       - name: Write version file
         run: echo "${{ github.sha }}" > ./web/version
 
-      # Cache-JSON, e-mailarchief en de root-.htaccess blijven op de server.
-      # lftp: het laatste passende patroon wint. Includes staan daarom
-      # ná de excludes, anders uploaden de .htaccess-bestanden in data/ en cache/ niet.
+      # Deploy-guard: draait hetzelfde mirror-commando tegen een nep-server (file://) met
+      # dummybestanden op de paden uit .github/deploy-protected.txt. Faalt als er iets
+      # beschermds verdwijnt of overschreven wordt; dan draait de FTP-stap niet.
+      - name: Deploy-guard (beschermde server-paden)
+        run: bash .github/deploy-guard.sh .github/workflows/deploy-ftp.yml
+
+      # Stap 1: alles op de server opruimen behalve server-state en secrets.
       - name: Deploy web/ to FTP (with delete & excludes)
         env:
           FTP_HOST: ${{ secrets.FTP_HOST }}
@@ -93,50 +97,12 @@ jobs:
           mirror -R --delete \
             --exclude-glob .htaccess \
             --exclude-glob cache/** \
-            --exclude-glob cache/odata/** \
-            --exclude-glob cache/odata/*/ \
-            --exclude-glob cache/summaries/** \
-            --exclude-glob cache/summaries/*/ \
             --exclude-glob data/** \
-            --exclude-glob data/emails/** \
-            --exclude-glob data/emails/*/ \
-            --exclude-glob data/php_errors/** \
-            --exclude-glob data/php_errors/*/ \
-            --exclude-glob data/user_prefs/** \
-            --exclude-glob data/user_prefs/*/ \
             --exclude-glob email-worker/config.json \
             --exclude-glob email-worker/node_modules/** \
             --exclude-glob analytics/*.sqlite \
             --exclude-glob analytics/*.sqlite-* \
             --exclude-glob auth.php \
-            --include-glob cache/ \
-            --include-glob cache/odata/ \
-            --include-glob cache/summaries/ \
-            --include-glob cache/.htaccess \
-            --include-glob cache/index.html \
-            --include-glob cache/index.php \
-            --include-glob cache/odata/.htaccess \
-            --include-glob cache/odata/index.html \
-            --include-glob cache/odata/index.php \
-            --include-glob cache/summaries/.htaccess \
-            --include-glob cache/summaries/index.html \
-            --include-glob cache/summaries/index.php \
-            --include-glob data/ \
-            --include-glob data/emails/ \
-            --include-glob data/php_errors/ \
-            --include-glob data/user_prefs/ \
-            --include-glob data/.htaccess \
-            --include-glob data/index.html \
-            --include-glob data/index.php \
-            --include-glob data/emails/.htaccess \
-            --include-glob data/emails/index.html \
-            --include-glob data/emails/index.php \
-            --include-glob data/php_errors/.htaccess \
-            --include-glob data/php_errors/index.html \
-            --include-glob data/php_errors/index.php \
-            --include-glob data/user_prefs/.htaccess \
-            --include-glob data/user_prefs/index.html \
-            --include-glob data/user_prefs/index.php \
             ./web .
 
           set cmd:fail-exit false
