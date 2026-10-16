@@ -24,3 +24,14 @@ $auth_list = [
 $environment = 'Production';
 $auth = $auth_list[$environment];
 $baseUrl = 'https://my-bc-domain.com:7148/';
+
+// Wie odata.php?action=… mag aanroepen. Zelfde vorm als de andere KVT-apps:
+// een lijst van e-mailadressen, of e-mail => extra rechten.
+// $allowedUsers = [
+//     'user@domain.nl',
+// ];
+
+// Optioneel, alleen als een HTTP-runner odata.php?action=… moet aanroepen.
+// Header X-Clio-Secret moet exact dit geheim zijn. Weglaten: geen anonieme toegang.
+// CLI heeft dit niet nodig.
+// $clioRunnerSecret = '';

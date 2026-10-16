@@ -1,11 +1,43 @@
 
 web/auth.php
 
-web/cache/
+web/cache/*
+!web/cache/.htaccess
+!web/cache/index.html
+!web/cache/index.php
+!web/cache/odata/
+web/cache/odata/*
+!web/cache/odata/.htaccess
+!web/cache/odata/index.html
+!web/cache/odata/index.php
+!web/cache/summaries/
+web/cache/summaries/*
+!web/cache/summaries/.htaccess
+!web/cache/summaries/index.html
+!web/cache/summaries/index.php
 
 BC Webservices.txt
 
-web/data/
+web/data/*
+!web/data/.htaccess
+!web/data/index.html
+!web/data/index.php
+!web/data/emails/
+web/data/emails/*
+!web/data/emails/.htaccess
+!web/data/emails/index.html
+!web/data/emails/index.php
+!web/data/php_errors/
+web/data/php_errors/*
+!web/data/php_errors/.htaccess
+!web/data/php_errors/index.html
+!web/data/php_errors/index.php
+!web/data/user_prefs/
+web/data/user_prefs/*
+!web/data/user_prefs/.htaccess
+!web/data/user_prefs/index.html
+!web/data/user_prefs/index.php
+
 web/email-worker/config.json
 
 vapid-keys/

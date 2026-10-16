@@ -8,6 +8,8 @@ import {
   determineChainId,
   findThreadFolderByChainId,
   planArchiveRawEmail,
+  PRIVATE_DIRECTORY_HTACCESS,
+  protectArchiveTree,
   sanitizeChainId,
   sanitizeSubject,
 } from './archive.js';
@@ -113,6 +115,27 @@ test('archiveRawEmail writes html body next to eml and text', async () => {
     assert.equal(result.htmlFile, '0001-html-test.html');
     assert.equal(await fs.readFile(htmlPath, 'utf8'), '<p>HTML body</p>');
     assert.equal(meta.emails[0].html_file, '0001-html-test.html');
+    assert.equal(await fs.readFile(path.join(archiveRoot, '.htaccess'), 'utf8'), PRIVATE_DIRECTORY_HTACCESS);
+    assert.equal(await fs.readFile(path.join(archiveRoot, result.folderName, '.htaccess'), 'utf8'), PRIVATE_DIRECTORY_HTACCESS);
+    assert.equal(await fs.readFile(path.join(archiveRoot, result.folderName, 'index.html'), 'utf8'), '');
+    assert.equal(await fs.readFile(path.join(archiveRoot, result.folderName, 'index.php'), 'utf8'), '');
+  } finally {
+    await fs.rm(archiveRoot, { recursive: true, force: true });
+  }
+});
+
+test('protectArchiveTree seals existing thread folders', async () => {
+  const archiveRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'clio-mail-guard-'));
+  const thread = path.join(archiveRoot, 'Onderwerp~someone@example.test');
+
+  try {
+    await fs.mkdir(thread, { recursive: true });
+    await fs.writeFile(path.join(thread, '0001-onderwerp.eml'), 'raw');
+    await protectArchiveTree(archiveRoot);
+
+    assert.equal(await fs.readFile(path.join(thread, '.htaccess'), 'utf8'), PRIVATE_DIRECTORY_HTACCESS);
+    assert.equal(await fs.readFile(path.join(thread, '0001-onderwerp.eml'), 'utf8'), 'raw');
+    assert.equal(await fs.readFile(path.join(archiveRoot, 'index.php'), 'utf8'), '');
   } finally {
     await fs.rm(archiveRoot, { recursive: true, force: true });
   }

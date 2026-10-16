@@ -17,7 +17,6 @@ $summaries = [];
 $selectedSummaryText = '';
 $selectedSummaryName = '';
 $selectedSummaryPendingMessage = '';
-$selectedSummaryCacheUrl = '';
 $pageError = '';
 
 $selectedEmailThreadFolder = trim((string) ($_GET['thread'] ?? ''));

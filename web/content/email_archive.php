@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/directory_guard.php';
+
 /**
  * Constants
  */
@@ -267,12 +269,39 @@ function formatEmailArchiveContacts(array $contacts): array
     return array_values($formatted);
 }
 
+function protectEmailArchiveDirectories(): void
+{
+    $root = getEmailArchiveRoot();
+    if (!is_dir($root)) {
+        return;
+    }
+
+    clioProtectWebDirectory($root);
+    $entries = scandir($root);
+    if (!is_array($entries)) {
+        return;
+    }
+
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+
+        $path = $root . DIRECTORY_SEPARATOR . $entry;
+        if (is_dir($path)) {
+            clioProtectWebDirectory($path);
+        }
+    }
+}
+
 function loadEmailArchiveThreads(): array
 {
     $root = getEmailArchiveRoot();
     if (!is_dir($root)) {
         return [];
     }
+
+    protectEmailArchiveDirectories();
 
     $entries = scandir($root);
     if (!is_array($entries)) {
@@ -325,6 +354,8 @@ function loadEmailArchiveThreads(): array
 
 function loadEmailArchiveThread(string $folderName): ?array
 {
+    protectEmailArchiveDirectories();
+
     $parsed = parseEmailArchiveFolderName($folderName);
     if ($parsed === null) {
         return null;

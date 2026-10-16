@@ -121,6 +121,13 @@ final class EmailArchiveTest extends TestCase
             realpath($threadPath . DIRECTORY_SEPARATOR . '0001-project-update.eml'),
             resolveEmailArchiveEmlPath($folder, '0001-project-update.eml')
         );
+
+        $rules = (string) file_get_contents($threadPath . DIRECTORY_SEPARATOR . '.htaccess');
+        $this->assertStringContainsString('Options -Indexes', $rules);
+        $this->assertStringContainsString('Require all denied', $rules);
+        $this->assertStringContainsString('Deny from all', $rules);
+        $this->assertFileExists($threadPath . DIRECTORY_SEPARATOR . 'index.html');
+        $this->assertFileExists($threadPath . DIRECTORY_SEPARATOR . 'index.php');
     }
 
     private function removeDirectory(string $path): void

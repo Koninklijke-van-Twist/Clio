@@ -402,6 +402,10 @@ function saveUserPref(string $email, string $key, mixed $value): void
     if (!is_dir($dir)) {
         mkdir($dir, 0750, true);
     }
+    if (!function_exists('clioProtectWebDirectory')) {
+        require_once __DIR__ . '/directory_guard.php';
+    }
+    clioProtectWebDirectory($dir);
     $prefs = loadUserPrefs($email);
     $prefs[$key] = $value;
     file_put_contents($path, json_encode($prefs, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
