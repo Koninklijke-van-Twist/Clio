@@ -48,6 +48,10 @@ function isValidCsrf(?string $token): bool
 
 function setFlash(string $type, string $message): void
 {
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
+
     $_SESSION['flash'] = [
         'type' => $type,
         'message' => $message,
@@ -845,6 +849,7 @@ function getSummaryCachePath(string $driveItemId): string
 function getSummaryCacheWebPath(string $driveItemId): string
 {
     $safeId = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $driveItemId);
+    // Relatief pad op schijf. Niet als href gebruiken: cache/ is via HTTP dicht.
     return 'cache/summaries/' . $safeId . '.md';
 }
 

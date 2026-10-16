@@ -8,6 +8,22 @@ import { simpleParser } from 'mailparser';
 
 export const FOLDER_SEPARATOR = '~';
 
+export const ARCHIVE_DIRECTORY_HTACCESS = `Options -Indexes
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Deny from all
+</IfModule>
+`;
+
+export async function ensureArchiveDirectoryGuards(directoryPath) {
+  await fs.mkdir(directoryPath, { recursive: true });
+  await fs.writeFile(path.join(directoryPath, '.htaccess'), ARCHIVE_DIRECTORY_HTACCESS);
+  await fs.writeFile(path.join(directoryPath, 'index.html'), '');
+  await fs.writeFile(path.join(directoryPath, 'index.php'), '');
+}
+
 /**
  * Public methods
  */
@@ -96,7 +112,7 @@ export async function archiveRawEmail(rawEmail, archiveRoot) {
   const plan = await planArchiveRawEmail(rawEmail, archiveRoot, parsed);
   const folderName = plan.folderName;
   const folderPath = plan.folderPath;
-  await fs.mkdir(folderPath, { recursive: true });
+  await ensureArchiveDirectoryGuards(folderPath);
 
   const meta = await loadMeta(folderPath);
   const sequence = plan.sequence;

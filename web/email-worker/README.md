@@ -5,9 +5,9 @@ Deze map moet mee naar productie, omdat productie alleen de inhoud van `web/` kr
 Behoud bij deploys of uploads altijd deze serverbestanden:
 
 - `web/email-worker/config.json`
-- `web/data/emails/`
+- de inhoud van `web/data/emails/` (conversatiemappen, `.eml`, `.txt`, `.html`, `meta.json`)
 
-`config.json` bevat mailboxconfiguratie en staat bewust niet in Git. `web/data/emails/` bevat het gearchiveerde emailarchief en wordt door de worker aangemaakt als de map nog niet bestaat.
+`config.json` bevat mailboxconfiguratie en staat bewust niet in Git. `web/data/emails/` bevat het gearchiveerde emailarchief en wordt door de worker aangemaakt als de map nog niet bestaat. De FTP-deploy uploadt wel de lege `index.html`/`index.php` en `.htaccess` in `data/` en `data/emails/`, maar overschrijft of verwijdert het archief niet. Nieuwe conversatiemappen krijgen diezelfde afscherming van de worker. De webapp leest de mails via PHP, niet via een directe URL.
 
 ## Microsoft Graph configuratie
 

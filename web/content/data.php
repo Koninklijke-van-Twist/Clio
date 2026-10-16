@@ -25,7 +25,12 @@ if ($page === 'summaries') {
 
             if (($selectedItem['is_openable'] ?? false) === true) {
                 $selectedSummaryText = getDriveItemTextById($selectedSummaryId);
-                $selectedSummaryCacheUrl = getSummaryCacheWebPath($selectedSummaryId);
+                // cache/summaries is niet publiek; de download loopt via PHP met login.
+                $selectedSummaryCacheUrl = appUrl('index.php', [
+                    'page' => 'summaries',
+                    'action' => 'download_summary',
+                    'summary_id' => $selectedSummaryId,
+                ]);
             } else {
                 $etaText = (string) ($selectedItem['eta_text'] ?? LOC('summary.eta_less_than_minute'));
                 $selectedSummaryPendingMessage = LOC('summary.unprocessed_eta', $etaText);

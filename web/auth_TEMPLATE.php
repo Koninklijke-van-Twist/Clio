@@ -24,3 +24,15 @@ $auth_list = [
 $environment = 'Production';
 $auth = $auth_list[$environment];
 $baseUrl = 'https://my-bc-domain.com:7148/';
+
+// Wie odata.php?action=… mag aanroepen (cache_status, cache_delete, cache_clear).
+// Zonder deze lijst weigert Clio die acties, ook voor een ingelogde gebruiker.
+// Staat de lijst er wel, dan geldt hij ook voor de UI-acties (download, upload, favoriet).
+// $allowedUsers = [
+//     "user@kvt.nl",
+// ];
+
+// Optioneel, alleen als een HTTP-runner odata.php?action=… moet aanroepen.
+// Header X-Clio-Secret moet exact dit geheim zijn. Weglaten: geen anonieme toegang.
+// CLI (php web/odata.php) heeft dit niet nodig.
+// $clioRunnerSecret = '';

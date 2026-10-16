@@ -1,8 +1,20 @@
 <?php
 
 /**
+ * Includes/requires
+ */
+
+require_once __DIR__ . '/action_access.php';
+
+/**
  * Page load
  */
+
+if (clio_script_is_direct_action_endpoint((string) ($_SERVER['SCRIPT_FILENAME'] ?? ''))) {
+    clio_deny_page_action();
+}
+
+clio_require_page_action_access();
 
 if ((string) ($_GET['action'] ?? '') === 'toggle_favorite') {
     $summaryId = trim((string) ($_GET['summary_id'] ?? ''));
@@ -51,16 +63,20 @@ if ((string) ($_GET['action'] ?? '') === 'download_summary') {
             throw new RuntimeException(LOC('summary.load_failed', LOC('error.unexpected')));
         }
 
-        $cachePath = getSummaryCachePath($summaryId);
-        if (is_file($cachePath)) {
-            header('Location: ' . getSummaryCacheWebPath($summaryId));
-            exit;
-        }
-
         $filename = summaryDownloadFilename((string) ($selectedDownloadItem['name'] ?? ''), $summaryId);
+        $cachePath = getSummaryCachePath($summaryId);
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
         header('Content-Type: text/markdown; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');
         header('X-Content-Type-Options: nosniff');
+        if (is_file($cachePath)) {
+            header('Content-Length: ' . (string) filesize($cachePath));
+            readfile($cachePath);
+            exit;
+        }
+
         echo $text;
         exit;
     } catch (Throwable $exception) {
@@ -89,6 +105,9 @@ if ((string) ($_GET['action'] ?? '') === 'download_email_eml') {
             throw new RuntimeException(LOC('email.download_failed'));
         }
 
+        if (session_status() === PHP_SESSION_ACTIVE) {
+            session_write_close();
+        }
         header('Content-Type: message/rfc822');
         header('Content-Disposition: attachment; filename="' . $emlFile . '"');
         header('Content-Length: ' . (string) filesize($emlPath));

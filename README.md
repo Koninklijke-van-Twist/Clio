@@ -23,4 +23,4 @@ Dit geldt voor live webrequests én voor CLI/cron. `web/content/bootstrap.php` l
 
 De email-worker (Node) leest geen Business Central OData; die gebruikt Microsoft Graph. Zonder `$mimirApi` blijft alleen de directe BC-route actief.
 
-De fallback staat in `web/odata.php`. Dat bestand verder niet wijzigen; deze fallback is een goedgekeurde uitzondering (Tim Falken, 2026-09-28).
+De fallback staat in `web/odata.php`. Dat bestand verder niet wijzigen, behalve deze fallback (Tim Falken, 2026-09-28) en de login-gate op `odata.php?action=` (16-10-2026). Die acties eisen een ingelogde gebruiker uit `$allowedUsers`, of CLI, of header `X-Clio-Secret`. `cache_status` geeft geen voorbeeldrijen terug. `web/data/` en `web/cache/` zijn via HTTP dicht; e-mails en samenvattingen gaan via `index.php` na login.

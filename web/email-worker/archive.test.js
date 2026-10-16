@@ -4,6 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
+  ARCHIVE_DIRECTORY_HTACCESS,
   archiveRawEmail,
   determineChainId,
   findThreadFolderByChainId,
@@ -113,6 +114,15 @@ test('archiveRawEmail writes html body next to eml and text', async () => {
     assert.equal(result.htmlFile, '0001-html-test.html');
     assert.equal(await fs.readFile(htmlPath, 'utf8'), '<p>HTML body</p>');
     assert.equal(meta.emails[0].html_file, '0001-html-test.html');
+
+    const threadDir = path.join(archiveRoot, result.folderName);
+    const htaccess = await fs.readFile(path.join(threadDir, '.htaccess'), 'utf8');
+    assert.equal(htaccess, ARCHIVE_DIRECTORY_HTACCESS);
+    assert.match(htaccess, /Options -Indexes/);
+    assert.match(htaccess, /Require all denied/);
+    assert.match(htaccess, /Deny from all/);
+    assert.equal(await fs.readFile(path.join(threadDir, 'index.html'), 'utf8'), '');
+    assert.equal(await fs.readFile(path.join(threadDir, 'index.php'), 'utf8'), '');
   } finally {
     await fs.rm(archiveRoot, { recursive: true, force: true });
   }
