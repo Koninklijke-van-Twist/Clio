@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/directory_guard.php';
+
 /**
  * Functies
  */
@@ -158,6 +160,7 @@ function writeSharePointUploadResponseLog(string $phase, array $response, array 
     if (!is_dir($dir)) {
         @mkdir($dir, 0750, true);
     }
+    clioProtectWebDirectory($dir);
 
     $lines = [
         'timestamp=' . gmdate('c'),
@@ -346,6 +349,7 @@ function getSharePointAccessToken(array $config, bool $forceRefresh = false): st
     if (!is_dir($cacheDir)) {
         mkdir($cacheDir, 0750, true);
     }
+    clioProtectWebDirectory($cacheDir);
 
     $fullCache = [];
     if (is_file($cachePath)) {
@@ -763,6 +767,7 @@ function saveUserFavoriteStates(string $email, array $states): void
     if (!is_dir($dir)) {
         mkdir($dir, 0750, true);
     }
+    clioProtectWebDirectory($dir);
 
     file_put_contents($path, json_encode($clean, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 }
@@ -844,6 +849,8 @@ function getSummaryCachePath(string $driveItemId): string
 
 function getSummaryCacheWebPath(string $driveItemId): string
 {
+    // Relatief cachepad. Geen publieke URL: cache/ weigert directe requests.
+    // De download loopt via index.php?action=download_summary.
     $safeId = preg_replace('/[^a-zA-Z0-9_\-]/', '_', $driveItemId);
     return 'cache/summaries/' . $safeId . '.md';
 }
@@ -917,6 +924,8 @@ function saveCachedSummaryText(string $driveItemId, string $text): void
     if (!is_dir($cacheDir)) {
         mkdir($cacheDir, 0750, true);
     }
+    clioProtectWebDirectory(dirname($cacheDir));
+    clioProtectWebDirectory($cacheDir);
 
     file_put_contents(getSummaryCachePath($driveItemId), $text);
 }

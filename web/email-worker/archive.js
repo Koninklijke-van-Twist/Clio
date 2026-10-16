@@ -8,6 +8,53 @@ import { simpleParser } from 'mailparser';
 
 export const FOLDER_SEPARATOR = '~';
 
+export const PRIVATE_DIRECTORY_HTACCESS = [
+  'Options -Indexes',
+  '<IfModule mod_authz_core.c>',
+  '    Require all denied',
+  '</IfModule>',
+  '<IfModule !mod_authz_core.c>',
+  '    Deny from all',
+  '</IfModule>',
+  '',
+].join('\n');
+
+export async function protectPrivateDirectory(dir) {
+  await fs.mkdir(dir, { recursive: true });
+  const htaccessPath = path.join(dir, '.htaccess');
+  let current = null;
+  try {
+    current = await fs.readFile(htaccessPath, 'utf8');
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+  if (current !== PRIVATE_DIRECTORY_HTACCESS) {
+    await fs.writeFile(htaccessPath, PRIVATE_DIRECTORY_HTACCESS);
+  }
+
+  for (const name of ['index.html', 'index.php']) {
+    const indexPath = path.join(dir, name);
+    try {
+      await fs.access(indexPath);
+    } catch (error) {
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
+      await fs.writeFile(indexPath, '');
+    }
+  }
+}
+
+export async function protectArchiveTree(archiveRoot) {
+  await protectPrivateDirectory(archiveRoot);
+  const entries = await fs.readdir(archiveRoot, { withFileTypes: true });
+  await Promise.all(entries.filter((entry) => entry.isDirectory()).map((entry) => (
+    protectPrivateDirectory(path.join(archiveRoot, entry.name))
+  )));
+}
+
 /**
  * Public methods
  */
@@ -97,6 +144,8 @@ export async function archiveRawEmail(rawEmail, archiveRoot) {
   const folderName = plan.folderName;
   const folderPath = plan.folderPath;
   await fs.mkdir(folderPath, { recursive: true });
+  await protectPrivateDirectory(archiveRoot);
+  await protectPrivateDirectory(folderPath);
 
   const meta = await loadMeta(folderPath);
   const sequence = plan.sequence;

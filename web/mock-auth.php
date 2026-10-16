@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+require_once __DIR__ . '/kvt_protect_dirs.php';
 
 // Productie-auth.php mag $mimirApi zetten, maar $auth_list / $environment / $auth / $baseUrl
 // moeten daarnaast blijven staan: dat is de directe BC-fallback als Mímir uitvalt.

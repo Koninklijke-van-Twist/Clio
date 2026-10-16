@@ -55,7 +55,7 @@
                 </div>
                 <article id="markdownPreview" class="markdown"></article>
                 <a class="button-link" download
-                    href="<?= h($selectedSummaryCacheUrl !== '' ? $selectedSummaryCacheUrl : appUrl('index.php', ['page' => 'summaries', 'action' => 'download_summary', 'summary_id' => $selectedSummaryId])) ?>">
+                    href="<?= h(appUrl('index.php', ['page' => 'summaries', 'action' => 'download_summary', 'summary_id' => $selectedSummaryId])) ?>">
                     <?= h(LOC('summary.download_md')) ?>
                 </a>
                 <?php foreach ($summaries as $item): ?>

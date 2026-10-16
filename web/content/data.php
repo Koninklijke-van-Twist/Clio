@@ -25,7 +25,6 @@ if ($page === 'summaries') {
 
             if (($selectedItem['is_openable'] ?? false) === true) {
                 $selectedSummaryText = getDriveItemTextById($selectedSummaryId);
-                $selectedSummaryCacheUrl = getSummaryCacheWebPath($selectedSummaryId);
             } else {
                 $etaText = (string) ($selectedItem['eta_text'] ?? LOC('summary.eta_less_than_minute'));
                 $selectedSummaryPendingMessage = LOC('summary.unprocessed_eta', $etaText);

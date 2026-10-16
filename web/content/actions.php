@@ -51,12 +51,6 @@ if ((string) ($_GET['action'] ?? '') === 'download_summary') {
             throw new RuntimeException(LOC('summary.load_failed', LOC('error.unexpected')));
         }
 
-        $cachePath = getSummaryCachePath($summaryId);
-        if (is_file($cachePath)) {
-            header('Location: ' . getSummaryCacheWebPath($summaryId));
-            exit;
-        }
-
         $filename = summaryDownloadFilename((string) ($selectedDownloadItem['name'] ?? ''), $summaryId);
         header('Content-Type: text/markdown; charset=utf-8');
         header('Content-Disposition: attachment; filename="' . $filename . '"');

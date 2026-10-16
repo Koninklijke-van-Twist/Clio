@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/directory_guard.php';
+
 /**
  * Includes/requires
  */
@@ -36,6 +38,7 @@ function clioGetErrorDumpDir(): ?string
 
     foreach ($candidates as $dir) {
         if (is_dir($dir) || mkdir($dir, 0750, true)) {
+            clioProtectWebDirectory($dir);
             return $dir;
         }
     }

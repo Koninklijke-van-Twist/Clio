@@ -3,7 +3,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { archiveRawEmail } from './archive.js';
+import { archiveRawEmail, protectArchiveTree } from './archive.js';
 import { sendArchiveNotifications } from './mail-notify.js';
 import { loadIctUsers } from './ict-users.js';
 import { handleProjectSharePointUpload, extractProjectNumber } from './project.js';
@@ -96,6 +96,7 @@ export function buildGraphMessagesUrl(graphConfig, options = {}) {
 export async function processMailbox(config, options = {}) {
   const fetchImpl = options.fetchImpl ?? fetch;
   const archiveRoot = path.resolve(__dirname, config.archiveRoot ?? '../data/emails');
+  await protectArchiveTree(archiveRoot);
   const graph = config.graph;
   const token = await getGraphAccessToken(graph, fetchImpl);
   const messages = await listGraphMessages(graph, token, fetchImpl);
