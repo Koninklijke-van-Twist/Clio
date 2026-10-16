@@ -1556,6 +1556,11 @@ function odata_require_direct_action_access(): void
     if (!is_file($loginLib)) {
         odata_deny_action_access();
     }
+    // bootstrap.php start de sessie vóór login/lib.php. Zonder actieve sessie
+    // leest die library de logincookie niet en blijft $_SESSION['user'] leeg.
+    if (session_status() !== PHP_SESSION_ACTIVE) {
+        session_start();
+    }
     require_once $loginLib;
 
     global $allowedUsers;

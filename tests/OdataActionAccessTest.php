@@ -39,9 +39,14 @@ final class OdataActionAccessTest extends TestCase
         $gate = substr($odataSource, $gateStart, $gateEnd - $gateStart);
         $emailAt = strpos($gate, 'odata_email_is_allowed');
         $releaseAt = strpos($gate, 'odata_release_session_lock()');
+        $sessionAt = strpos($gate, 'session_start()');
+        $requireLibAt = strpos($gate, 'require_once $loginLib');
         $this->assertNotFalse($emailAt);
         $this->assertNotFalse($releaseAt);
+        $this->assertNotFalse($sessionAt);
+        $this->assertNotFalse($requireLibAt);
         $this->assertLessThan($releaseAt, $emailAt);
+        $this->assertLessThan($requireLibAt, $sessionAt);
 
         $this->assertStringContainsString('php_sapi_name()', $odataSource);
         $this->assertStringContainsString("=== 'cli'", $odataSource);
@@ -375,6 +380,176 @@ final class OdataActionAccessTest extends TestCase
         }
         $this->assertStringContainsString('Geen toegang', $stdout);
         $this->assertStringNotContainsString('Customer_Ledger_Entries', $stdout);
+    }
+
+    public function testAllowlistedSessionCookieCanRunCacheStatus(): void
+    {
+        $phpCgi = trim((string) shell_exec('command -v php-cgi 2>/dev/null'));
+        if ($phpCgi === '') {
+            $this->markTestSkipped('php-cgi ontbreekt');
+        }
+
+        $root = dirname(__DIR__);
+        $loginDir = $root . '/login';
+        $loginLib = $loginDir . '/lib.php';
+        if (is_file($loginLib)) {
+            $this->markTestSkipped('login/lib.php bestaat al');
+        }
+        $sessionDir = sys_get_temp_dir() . '/clio-odata-sess-' . bin2hex(random_bytes(4));
+        $authPath = sys_get_temp_dir() . '/clio-odata-auth-' . bin2hex(random_bytes(4)) . '.php';
+        $script = sys_get_temp_dir() . '/clio-odata-session-' . bin2hex(random_bytes(4)) . '.php';
+        $statusPath = sys_get_temp_dir() . '/clio-odata-login-status-' . bin2hex(random_bytes(4)) . '.txt';
+        $sessionName = 'PHPSESSID';
+        $allowedId = bin2hex(random_bytes(16));
+        $otherId = bin2hex(random_bytes(16));
+        $odataFile = $root . '/web/odata.php';
+
+        $createdLoginDir = !is_dir($loginDir);
+        try {
+            if ($createdLoginDir && !mkdir($loginDir, 0700, true) && !is_dir($loginDir)) {
+                $this->fail('login-map aanmaken mislukt');
+            }
+            mkdir($sessionDir, 0700, true);
+            file_put_contents($authPath, "<?php\n\$allowedUsers = ['analyst@kvt.nl'];\n");
+            file_put_contents($loginLib, "<?php\n"
+                . 'file_put_contents(' . var_export($statusPath, true) . ', (string) session_status());' . "\n"
+                . 'if (session_status() === PHP_SESSION_ACTIVE) {' . "\n"
+                . '    session_write_close();' . "\n"
+                . '}' . "\n");
+            file_put_contents($script, "<?php\n"
+                . '$_SERVER["SCRIPT_FILENAME"] = ' . var_export($odataFile, true) . ";\n"
+                . '$_SERVER["SCRIPT_NAME"] = "/clio/odata.php";' . "\n"
+                . '$_SERVER["PHP_SELF"] = "/clio/odata.php";' . "\n"
+                . '$_SERVER["REMOTE_ADDR"] = "203.0.113.50";' . "\n"
+                . '$_SERVER["SERVER_ADDR"] = "198.51.100.10";' . "\n"
+                . '$_GET["action"] = "cache_status";' . "\n"
+                . '$GLOBALS["CLIO_AUTH_PHP_PATH"] = ' . var_export($authPath, true) . ";\n"
+                . 'require ' . var_export($odataFile, true) . ";\n");
+
+            $this->writeOdataProbeSession($sessionDir, $sessionName, $allowedId, 'analyst@kvt.nl');
+            $this->writeOdataProbeSession($sessionDir, $sessionName, $otherId, 'andere@kvt.nl');
+
+            $allowed = $this->runOdataCgiAction($phpCgi, $script, $root, $sessionDir, $sessionName, $allowedId);
+            $this->assertSame('2', trim((string) @file_get_contents($statusPath)));
+            $this->assertStringNotContainsString('Status: 403', $allowed['stdout']);
+            $this->assertIsArray($allowed['json'], $allowed['stdout']);
+            $this->assertArrayHasKey('bytes', $allowed['json']);
+            $this->assertArrayHasKey('entries', $allowed['json']);
+            $this->assertArrayNotHasKey('error', $allowed['json']);
+
+            @unlink($statusPath);
+            $other = $this->runOdataCgiAction($phpCgi, $script, $root, $sessionDir, $sessionName, $otherId);
+            $this->assertStringContainsString('Status: 403', $other['stdout']);
+            $this->assertSame('Geen toegang', $other['json']['error'] ?? null);
+
+            @unlink($statusPath);
+            $anonymous = $this->runOdataCgiAction($phpCgi, $script, $root, $sessionDir, $sessionName, '');
+            $this->assertStringContainsString('Status: 403', $anonymous['stdout']);
+            $this->assertSame('Geen toegang', $anonymous['json']['error'] ?? null);
+        } finally {
+            @unlink($loginLib);
+            if ($createdLoginDir) {
+                @rmdir($loginDir);
+            }
+            @unlink($authPath);
+            @unlink($script);
+            @unlink($statusPath);
+            foreach (glob($sessionDir . '/sess_*') ?: [] as $sessionFile) {
+                @unlink($sessionFile);
+            }
+            @rmdir($sessionDir);
+        }
+    }
+
+    /**
+     * @return array{stdout: string, json: ?array}
+     */
+    private function runOdataCgiAction(
+        string $phpCgi,
+        string $script,
+        string $root,
+        string $sessionDir,
+        string $sessionName,
+        string $sessionId
+    ): array {
+        $command = [
+            $phpCgi,
+            '-d', 'display_errors=1',
+            '-d', 'session.auto_start=0',
+            '-d', 'session.use_cookies=1',
+            '-d', 'session.use_only_cookies=1',
+            '-d', 'session.use_strict_mode=0',
+            '-d', 'session.serialize_handler=php',
+            '-d', 'session.name=' . $sessionName,
+            '-d', 'session.save_path=' . $sessionDir,
+            $script,
+        ];
+        $env = [];
+        foreach (array_merge($_ENV, getenv() ?: []) as $key => $value) {
+            if (is_string($key) && is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        unset($env['HTTP_COOKIE']);
+        if ($sessionId !== '') {
+            $env['HTTP_COOKIE'] = $sessionName . '=' . $sessionId;
+        }
+
+        $descriptor = [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ];
+        $process = proc_open($command, $descriptor, $pipes, $root, $env);
+        $this->assertIsResource($process);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($process);
+        $stdout = is_string($stdout) ? $stdout : '';
+        $stderr = is_string($stderr) ? $stderr : '';
+        if ($exitCode !== 0 && strpos($stdout, 'Geen toegang') === false) {
+            $this->fail('cgi-actie exit ' . $exitCode . ' ' . $stderr . ' ' . $stdout);
+        }
+
+        $body = $stdout;
+        $separator = strpos($stdout, "\r\n\r\n");
+        if ($separator !== false) {
+            $body = substr($stdout, $separator + 4);
+        }
+        $decoded = json_decode($body, true);
+
+        return [
+            'stdout' => $stdout,
+            'json' => is_array($decoded) ? $decoded : null,
+        ];
+    }
+
+    private function writeOdataProbeSession(string $sessionDir, string $sessionName, string $sessionId, string $email): void
+    {
+        $writer = sys_get_temp_dir() . '/clio-odata-sess-writer-' . bin2hex(random_bytes(4)) . '.php';
+        file_put_contents($writer, "<?php\n"
+            . 'session_save_path($argv[1]);' . "\n"
+            . 'session_name($argv[2]);' . "\n"
+            . 'session_id($argv[3]);' . "\n"
+            . 'session_start();' . "\n"
+            . '$_SESSION["user"] = ["email" => $argv[4]];' . "\n"
+            . 'session_write_close();' . "\n");
+        $php = PHP_BINARY;
+        $command = escapeshellarg($php)
+            . ' -d session.use_strict_mode=0 -d session.serialize_handler=php '
+            . escapeshellarg($writer) . ' '
+            . escapeshellarg($sessionDir) . ' '
+            . escapeshellarg($sessionName) . ' '
+            . escapeshellarg($sessionId) . ' '
+            . escapeshellarg($email);
+        $output = [];
+        $exitCode = 1;
+        exec($command, $output, $exitCode);
+        @unlink($writer);
+        $this->assertSame(0, $exitCode, implode("\n", $output));
     }
 
     public function testDirectActionsScriptIsDenied(): void
